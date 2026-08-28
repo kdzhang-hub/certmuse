@@ -1,0 +1,32 @@
+name: Feature proposal
+description: Suggest a focused improvement with a clear user outcome.
+title: "[Feature]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Feature proposals work best when they begin with a user problem, not a preferred implementation. Do not attach private material or credentials.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: Identify the learner, operator, contributor, or maintainer affected.
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: What outcome do you want?
+      description: Describe observable behavior and the value it creates.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Explain existing workarounds or alternatives, if any.
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope and compatibility
+      description: Note affected areas and any possible migration or compatibility concern.

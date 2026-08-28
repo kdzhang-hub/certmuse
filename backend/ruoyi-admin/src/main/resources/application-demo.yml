@@ -1,0 +1,42 @@
+--- # Isolated local demo services supplied by infra/docker/compose.yml.
+spring:
+  datasource:
+    type: com.zaxxer.hikari.HikariDataSource
+    dynamic:
+      primary: master
+      strict: true
+      datasource:
+        master:
+          type: ${spring.datasource.type}
+          driverClassName: org.postgresql.Driver
+          url: ${CERTMUSE_DB_URL:jdbc:postgresql://127.0.0.1:5432/certmuse?ApplicationName=certmuse}
+          username: ${CERTMUSE_DB_USERNAME:certmuse}
+          password: ${CERTMUSE_DB_PASSWORD:certmuse_local}
+      hikari:
+        maxPoolSize: 12
+        minIdle: 2
+        connectionTimeout: 30000
+        validationTimeout: 5000
+        idleTimeout: 600000
+        maxLifetime: 1800000
+  data:
+    redis:
+      host: ${CERTMUSE_REDIS_HOST:127.0.0.1}
+      port: ${CERTMUSE_REDIS_PORT:6379}
+      database: ${CERTMUSE_REDIS_DATABASE:0}
+      password: ${CERTMUSE_REDIS_PASSWORD:certmuse_local}
+      timeout: 10s
+      ssl:
+        enabled: false
+
+redisson:
+  keyPrefix: certmuse
+  threads: 4
+  nettyThreads: 8
+  singleServerConfig:
+    clientName: CertMuse-demo
+    connectionMinimumIdleSize: 2
+    connectionPoolSize: 8
+    idleConnectionTimeout: 10000
+    timeout: 3000
+    subscriptionConnectionPoolSize: 4

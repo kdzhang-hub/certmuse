@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.dromara.certmuse.assessment.mapper.DiagnosticMapper">
+    <select id="selectActiveGoal" resultType="org.dromara.certmuse.assessment.domain.DiagnosticGoalRow">
+        select g.id,g.certification_id,ec.certification_name,g.syllabus_version_id,sv.version_name syllabus_version_name,g.row_version,g.target_exam_year,g.target_exam_month
+        from cm_user_goal g join cm_exam_certification ec on ec.id=g.certification_id join cm_syllabus_version sv on sv.id=g.syllabus_version_id
+        where g.user_id=#{userId} and g.status='active' order by g.update_time desc,g.id desc limit 1
+    </select>
+    <select id="selectLatestSession" resultType="org.dromara.certmuse.assessment.domain.DiagnosticSessionRow">
+        select id,user_id,goal_id,status,row_version,last_question_order,certification_id,syllabus_version_id,collection_revision_id,rule_version_id,cast(submitted_time as text) submitted_time
+        from cm_learning_session where user_id=#{userId} and goal_id=#{goalId} and session_type='initial_diagnosis' order by create_time desc,id desc limit 1
+    </select>
+    <select id="lockSession" resultType="org.dromara.certmuse.assessment.domain.DiagnosticSessionRow">
+        select id,user_id,goal_id,status,row_version,last_question_order,certification_id,syllabus_version_id,collection_revision_id,rule_version_id,cast(submitted_time as text) submitted_time
+        from cm_learning_session where user_id=#{userId} and id=#{sessionId} and session_type='initial_diagnosis' for update
+    </select>
+    <select id="lockSessionForWorker" resultType="org.dromara.certmuse.assessment.domain.DiagnosticSessionRow">
+        select id,user_id,goal_id,status,row_version,last_question_order,certification_id,syllabus_version_id,collection_revision_id,rule_version_id,cast(submitted_time as text) submitted_time
+        from cm_learning_session where id=#{sessionId} and session_type='initial_diagnosis' for update
+    </select>
+    <select id="selectAvailableRevision" resultType="org.dromara.certmuse.assessment.domain.DiagnosticRevisionRow">
+        select r.id,r.collection_id,r.question_count,r.duration_minutes,r.status from cm_collection_current cur
+        join cm_collection_revision r on r.id=cur.collection_revision_id join cm_collection c on c.id=r.collection_id
+        where c.collection_type='FIRST_DIAGNOSTIC' and r.status='published' and r.collection_type='FIRST_DIAGNOSTIC'
+          and r.certification_id=#{certificationId} and r.syllabus_version_id=#{syllabusVersionId} order by r.id desc limit 1
+    </select>
+    <select id="selectRevisionItems" resultType="org.dromara.certmuse.assessment.domain.DiagnosticItemRow">
+        select i.item_order question_order,qr.id question_revision_id,q.id question_id,q.exam_subject_id,kp.id knowledge_point_id,i.report_score,qr.question_type,'medium' difficulty,qr.stem,
+               cast(i.answer_schema as text) answer_schema,cast(qr.answer as text) answer_key,40 estimated_seconds_snapshot,
+               jsonb_build_object('schema_version','diagnostic_presentation/1.0','stem',qr.stem,'questionType',qr.question_type,'difficulty','medium',
+                 'options',coalesce((select jsonb_agg(jsonb_build_object('label',o.option_label,'content',o.option_text,'sortOrder',o.sort_order) order by o.sort_order) from cm_question_option o where o.question_revision_id=qr.id),'[]'::jsonb),
+                 'images',coalesce((select jsonb_agg(jsonb_build_object('sourceUrl',im.source_url,'storagePath',im.storage_path,'alt',im.alt_text,'sortOrder',im.image_order) order by im.image_order) from cm_question_image im where im.question_revision_id=qr.id),'[]'::jsonb))::text presentation_snapshot,
+               jsonb_build_object('schema_version','diagnostic_knowledge/1.0','items',coalesce((select jsonb_agg(jsonb_build_object('knowledgePointId',qk.knowledge_point_id,'knowledgePointName',leaf.syllabus_title,'examSubjectId',qk.exam_subject_id,'importance',leaf.importance,'relationRole',qk.relation_role,'sortOrder',qk.sort_order) order by qk.sort_order)
+                    from cm_question_knowledge qk join cm_knowledge_point leaf on leaf.id=qk.knowledge_point_id
+                    where qk.question_revision_id=qr.id and leaf.del_flag='0' and not exists(select 1 from cm_knowledge_point child where child.parent_id=leaf.id and child.del_flag='0')),'[]'::jsonb))::text knowledge_snapshot
+        from cm_collection_item i join cm_question_revision qr on qr.id=i.question_revision_id join cm_question q on q.id=qr.question_id
+        left join lateral (select leaf.id from cm_question_knowledge qk join cm_knowledge_point leaf on leaf.id=qk.knowledge_point_id
+            where qk.question_revision_id=qr.id and leaf.del_flag='0' and not exists(select 1 from cm_knowledge_point child where child.parent_id=leaf.id and child.del_flag='0')
+            order by case qk.relation_role when 'primary' then 0 else 1 end,qk.sort_order limit 1) kp on true
+        where i.collection_revision_id=#{revisionId} order by i.item_order
+    </select>
+    <select id="selectSessionItems" resultType="org.dromara.certmuse.assessment.domain.DiagnosticItemRow">
+        select sq.id session_question_id,qa.id attempt_id,aa.id answer_id,sq.question_order,sq.presentation_snapshot::text presentation_snapshot,aa.answer_data::text answer_data,qa.status
+        from cm_session_question sq join cm_question_attempt qa on qa.session_question_id=sq.id and qa.attempt_no=1 join cm_attempt_answer aa on aa.attempt_id=qa.id
+        where sq.session_id=#{sessionId} and qa.user_id=#{userId} order by sq.question_order
+    </select>
+    <select id="selectSessionItem" resultType="org.dromara.certmuse.assessment.domain.DiagnosticItemRow">
+        select sq.id session_question_id,qa.id attempt_id,aa.id answer_id,sq.question_order,sq.presentation_snapshot::text presentation_snapshot,aa.answer_data::text answer_data,qa.status,cast(qa.presented_at as text) presented_at
+        from cm_session_question sq join cm_question_attempt qa on qa.session_question_id=sq.id and qa.attempt_no=1 join cm_attempt_answer aa on aa.attempt_id=qa.id
+        where sq.session_id=#{sessionId} and qa.user_id=#{userId} and sq.question_order=#{order}
+    </select>
+    <select id="countAnswers" resultType="org.dromara.certmuse.assessment.domain.DiagnosticCountRow">
+        select count(*) filter(where aa.answer_data-&gt;'value' is not null and aa.answer_data-&gt;'value' &lt;&gt; 'null'::jsonb) answered_count,count(*) total_count,
+               min(sq.question_order) filter(where aa.answer_data-&gt;'value' is null or aa.answer_data-&gt;'value'='null'::jsonb) first_unanswered
+        from cm_session_question sq join cm_question_attempt qa on qa.session_question_id=sq.id and qa.attempt_no=1 join cm_attempt_answer aa on aa.attempt_id=qa.id where sq.session_id=#{sessionId} and qa.user_id=#{userId}
+    </select>
+    <insert id="insertSession">insert into cm_learning_session(id,user_id,goal_id,session_type,status,rule_version_id,request_id,started_time,certification_id,syllabus_version_id,collection_revision_id,target_exam_year,target_exam_month,last_question_order,row_version) values(#{id},#{userId},#{goal.id},'initial_diagnosis','in_progress',#{ruleVersionId},#{requestId},now(),#{goal.certificationId},#{goal.syllabusVersionId},#{revision.id},#{goal.targetExamYear},#{goal.targetExamMonth},1,0)</insert>
+    <insert id="insertSessionQuestion">insert into cm_session_question(id,session_id,question_id,question_revision_id,exam_subject_id,question_order,evidence_group_key,difficulty_snapshot,estimated_seconds_snapshot,presentation_snapshot,grading_snapshot,knowledge_snapshot,hint_allowed) values(#{id},#{sessionId},#{item.questionId},#{item.questionRevisionId},#{item.examSubjectId},#{item.questionOrder},concat('Q:',#{item.questionId}),#{item.difficulty},#{item.estimatedSecondsSnapshot},#{item.presentationSnapshot}::jsonb,jsonb_build_object('schema_version','diagnostic_grading/1.0','answer',#{item.answerKey}::jsonb,'maxScore',#{item.reportScore}),#{item.knowledgeSnapshot}::jsonb,false)</insert>
+    <insert id="insertAttempt">insert into cm_question_attempt(id,session_question_id,user_id,attempt_no,status,create_request_id) values(#{id},#{sessionQuestionId},#{userId},1,'in_progress',#{requestId})</insert>
+    <insert id="insertAnswer">insert into cm_attempt_answer(id,attempt_id,answer_data) values(#{id},#{attemptId},#{answer}::jsonb)</insert>
+    <update id="updateAnswer">update cm_attempt_answer set answer_data=#{answer}::jsonb,update_time=now() where id=#{answerId}</update>
+    <update id="updateSessionPosition">update cm_learning_session set last_question_order=#{order},row_version=row_version+1,update_time=now() where id=#{sessionId} and status='in_progress' and row_version=#{expected}</update>
+    <update id="markPresented">update cm_question_attempt set presented_at=coalesce(presented_at,now()),update_time=now() where id=#{attemptId}</update>
+    <select id="selectTiming" resultType="org.dromara.certmuse.assessment.domain.DiagnosticTimingRow">
+        select r.duration_minutes * 60 estimated_duration_seconds,coalesce(sum(coalesce(qa.elapsed_seconds,0)),0) effective_elapsed_seconds,cast(now() as text) server_time
+        from cm_learning_session s join cm_collection_revision r on r.id=s.collection_revision_id
+        left join cm_session_question sq on sq.session_id=s.id left join cm_question_attempt qa on qa.session_question_id=sq.id and qa.attempt_no=1
+        where s.id=#{sessionId} and s.user_id=#{userId} group by r.duration_minutes
+    </select>
+    <select id="lockTimerLease" resultType="org.dromara.certmuse.assessment.domain.DiagnosticTimerLeaseRow">
+        select session_id,question_order,attempt_id,lease_id,last_heartbeat_at from cm_diagnostic_timer_lease where session_id=#{sessionId} for update
+    </select>
+    <delete id="deleteTimerLease">delete from cm_diagnostic_timer_lease where session_id=#{sessionId}</delete>
+    <insert id="insertTimerLease">insert into cm_diagnostic_timer_lease(session_id,question_order,attempt_id,lease_id,started_at,last_heartbeat_at) values(#{sessionId},#{questionOrder},#{attemptId},#{leaseId},now(),now())</insert>
+    <update id="accumulateTimerInterval">update cm_question_attempt set elapsed_seconds=coalesce(elapsed_seconds,0)+#{seconds},presented_at=coalesce(presented_at,now()),timer_status=case when timer_status='invalid' then 'invalid' else 'valid' end,update_time=now() where id=#{attemptId}</update>
+    <update id="markTimerInvalid">update cm_question_attempt set timer_status='invalid',invalid_reason=coalesce(invalid_reason,#{reason}),update_time=now() where id=#{attemptId}</update>
+    <update id="activateTimer">update cm_question_attempt set presented_at=coalesce(presented_at,now()),timer_status=case when timer_status='missing' then 'valid' else timer_status end,update_time=now() where id=#{attemptId}</update>
+    <update id="submitSession">update cm_learning_session set status='submitted',submitted_time=now(),row_version=row_version+1,status_changed_time=now(),update_time=now() where id=#{sessionId} and status='in_progress' and row_version=#{expected}</update>
+    <update id="submitAttempts">update cm_question_attempt set status='submitted',submitted_time=now(),timer_status=case when presented_at is null then 'missing' else timer_status end,is_blank=exists(select 1 from cm_attempt_answer aa where aa.attempt_id=cm_question_attempt.id and (aa.answer_data-&gt;'value' is null or aa.answer_data-&gt;'value'='null'::jsonb)),is_skipped=exists(select 1 from cm_attempt_answer aa where aa.attempt_id=cm_question_attempt.id and (aa.answer_data-&gt;'value' is null or aa.answer_data-&gt;'value'='null'::jsonb)),update_time=now() where session_question_id in (select id from cm_session_question where session_id=#{sessionId}) and status='in_progress'</update>
+    <insert id="insertJob">insert into cm_async_job(id,job_type,business_key,payload,status,max_attempts) values(#{id},'DIAGNOSTIC_RESULT_PIPELINE',#{businessKey},#{payload}::jsonb,'queued',3) on conflict(job_type,business_key) do nothing</insert>
+    <select id="selectJob" resultType="org.dromara.certmuse.assessment.domain.DiagnosticJobRow">select id,status,payload::text,last_error from cm_async_job where job_type='DIAGNOSTIC_RESULT_PIPELINE' and business_key=#{businessKey}</select>
+    <update id="retryJob">update cm_async_job set status='queued',attempt_count=0,next_run_time=now(),last_error=null,finished_time=null,update_time=now() where job_type='DIAGNOSTIC_RESULT_PIPELINE' and business_key=#{businessKey} and status='failed'</update>
+    <select id="selectReport" resultType="org.dromara.certmuse.assessment.domain.DiagnosticReportRow">select status,subject_scores::text,profile_summary::text from cm_assessment_report where user_id=#{userId} and session_id=#{sessionId} and report_type='initial_diagnosis' order by id desc limit 1</select>
+    <select id="countSessionProfileEvidence" resultType="int">select count(*) from cm_learning_evidence where session_id=#{sessionId} and is_valid=true</select>
+    <select id="selectDiagnosticIdempotency" resultType="org.dromara.certmuse.assessment.domain.DiagnosticIdempotencyRow">select id,payload_hash,status,response_body::text from cm_idempotency_record where request_id=#{requestId} and action_code like 'DIAGNOSTIC_%' limit 1</select>
+    <insert id="insertIdempotency">insert into cm_idempotency_record(id,action_code,request_id,payload_hash,status,expires_time) values(#{id},#{action},#{requestId},#{hash},'processing',now()+interval '24 hours')</insert>
+    <update id="completeIdempotency">update cm_idempotency_record set status='succeeded',response_status=200,response_body=#{body}::jsonb,update_time=now() where id=#{id}</update>
+    <select id="claimResultJob" resultType="org.dromara.certmuse.assessment.domain.DiagnosticJobRow">
+        update cm_async_job set status='running',attempt_count=attempt_count+1,started_time=now(),lease_until=now()+interval '5 minutes',update_time=now()
+        where id=(select id from cm_async_job where job_type='DIAGNOSTIC_RESULT_PIPELINE' and status='queued' and next_run_time&lt;=now() and attempt_count&lt;max_attempts order by id for update skip locked limit 1)
+        returning id,status,payload::text,last_error
+    </select>
+    <update id="succeedJob">update cm_async_job set status='succeeded',payload=jsonb_set(payload,'{stage}','\"COMPLETED\"'::jsonb),finished_time=now(),lease_until=null,update_time=now() where id=#{id} and status='running'</update>
+    <update id="failJob">update cm_async_job set status='failed',finished_time=now(),lease_until=null,last_error=#{error},update_time=now() where id=#{id} and status='running'</update>
+    <select id="selectSubmittedItems" resultType="org.dromara.certmuse.assessment.domain.DiagnosticItemRow">
+        select aa.id answer_id,qa.id attempt_id,sq.id session_question_id,sq.question_revision_id,
+               aa.answer_data::text answer_data,aa.grading_status,aa.grading_result::text grading_result,aa.score,aa.max_score,aa.score_rate,
+               sq.presentation_snapshot::text presentation_snapshot,sq.grading_snapshot::text grading_snapshot,
+               sq.ai_rubric_snapshot::text ai_rubric_snapshot,sq.knowledge_snapshot::text knowledge_snapshot,
+               sq.evidence_group_key,sq.question_order,sq.exam_subject_id,sq.difficulty_snapshot difficulty,
+               sq.estimated_seconds_snapshot,(sq.grading_snapshot-&gt;&gt;'maxScore')::numeric report_score,qa.elapsed_seconds,qa.timer_status,
+               sq.presentation_snapshot-&gt;&gt;'questionType' question_type
+        from cm_session_question sq join cm_question_attempt qa on qa.session_question_id=sq.id and qa.attempt_no=1 join cm_attempt_answer aa on aa.attempt_id=qa.id
+        where sq.session_id=#{sessionId} order by sq.question_order
+    </select>
+    <select id="selectLeafCatalog" resultType="org.dromara.certmuse.assessment.domain.DiagnosticLeafRow">
+        select kp.id,kp.exam_subject_id,kp.importance from cm_learning_session s
+        join cm_knowledge_point kp on kp.syllabus_version_id=s.syllabus_version_id and kp.del_flag='0'
+        where s.id=#{sessionId} and not exists (select 1 from cm_knowledge_point child where child.parent_id=kp.id and child.del_flag='0')
+    </select>
+    <update id="scoreAnswer">update cm_attempt_answer set score=#{score},max_score=#{max},score_rate=#{rate},grading_status='graded',graded_time=now(),update_time=now() where id=#{answerId} and grading_status='pending'</update>
+    <update id="scoreSubjectiveAnswer">update cm_attempt_answer set score=#{score},max_score=#{max},score_rate=#{rate},grading_status='graded',grading_result=#{result}::jsonb,graded_time=now(),update_time=now() where id=#{answerId} and grading_status in ('pending','grading')</update>
+    <update id="failSubjectiveAnswer">update cm_attempt_answer set score=0,max_score=#{max},score_rate=0,grading_status='failed',grading_result=#{result}::jsonb,graded_time=now(),update_time=now() where id=#{answerId} and grading_status in ('pending','grading')</update>
+    <update id="updateAiRubricSnapshot">update cm_session_question set ai_rubric_snapshot=#{rubric}::jsonb where id=#{sessionQuestionId} and ai_rubric_snapshot is null</update>
+    <insert id="upsertReport">insert into cm_assessment_report(id,session_id,user_id,goal_id,report_type,total_score,max_score,subject_scores,profile_summary,status,rule_version_id,generated_time)
+        values(#{id},#{sessionId},#{userId},#{goalId},'initial_diagnosis',#{total},#{max},#{subjects}::jsonb,#{summary}::jsonb,'available',#{ruleVersionId},now())
+        on conflict(session_id,report_type) do update set total_score=excluded.total_score,max_score=excluded.max_score,subject_scores=excluded.subject_scores,profile_summary=excluded.profile_summary,status='available',generated_time=now(),update_time=now()</insert>
+    <select id="upsertOverallProfile" resultType="long">insert into cm_overall_profile(id,user_id,goal_id,subject_snapshot,overall_ability,profile_stage,gate_check_data,rule_version_id,calculated_time)
+        values(#{id},#{userId},#{goalId},#{snapshot}::jsonb,#{ability},'initial','{"schema_version":"1.0","gates":[],"all_passed":false}'::jsonb,#{ruleVersionId},now())
+        on conflict(user_id,goal_id) do update set subject_snapshot=excluded.subject_snapshot,overall_ability=excluded.overall_ability,rule_version_id=excluded.rule_version_id,calculated_time=now(),row_version=cm_overall_profile.row_version+1,update_time=now() returning id</select>
+    <update id="settleSession">update cm_learning_session set status='settling',status_changed_time=now(),update_time=now() where id=#{sessionId} and status='submitted'</update>
+    <update id="completeSession">update cm_learning_session set status='completed',settled_time=now(),status_changed_time=now(),update_time=now() where id=#{sessionId} and status='settling'</update>
+    <update id="advanceJobStage">update cm_async_job set payload=jsonb_set(payload,'{stage}',to_jsonb(#{stage}::text)),update_time=now() where id=#{id} and status='running'</update>
+    <update id="requeueJob">update cm_async_job set status='queued',attempt_count=greatest(attempt_count-1,0),payload=jsonb_set(payload,'{stage}',to_jsonb(#{stage}::text)),next_run_time=now(),lease_until=null,update_time=now() where id=#{id} and status='running'</update>
+    <select id="upsertKnowledgeProfile" resultType="long">insert into cm_knowledge_profile(id,user_id,goal_id,knowledge_point_id,baseline_direct_ability,current_direct_ability,confidence_level,profile_status,distinct_question_count,recent_trend,rule_version_id,calculated_time)
+        values(#{id},#{userId},#{goalId},#{knowledgePointId},#{ability},#{ability},#{confidence},#{status},#{count},'stable',#{ruleVersionId},now())
+        on conflict(user_id,goal_id,knowledge_point_id) do update set baseline_direct_ability=excluded.baseline_direct_ability,current_direct_ability=excluded.current_direct_ability,confidence_level=excluded.confidence_level,profile_status=excluded.profile_status,distinct_question_count=excluded.distinct_question_count,last_direct_evidence_time=now(),rule_version_id=excluded.rule_version_id,calculated_time=now(),row_version=cm_knowledge_profile.row_version+1,update_time=now() returning id</select>
+    <select id="upsertSubjectProfile" resultType="long">insert into cm_subject_profile(id,user_id,goal_id,exam_subject_id,knowledge_aggregate_score,subject_ability,diagnosis_completion_rate,target_coverage_rate,medium_high_coverage_rate,core_knowledge_covered,confidence_level,efficiency_status,efficiency_sample_count,time_risk_flag,guessing_risk_flag,rule_version_id,calculated_time)
+        values(#{id},#{userId},#{goalId},#{subjectId},#{ability},#{ability},1,#{targetCoverage},#{mediumHighCoverage},#{coreCovered},#{confidence},#{efficiencyStatus},#{efficiencyCount},#{timeRisk},#{guessingRisk},#{ruleVersionId},now())
+        on conflict(user_id,goal_id,exam_subject_id) do update set knowledge_aggregate_score=excluded.knowledge_aggregate_score,subject_ability=excluded.subject_ability,target_coverage_rate=excluded.target_coverage_rate,medium_high_coverage_rate=excluded.medium_high_coverage_rate,core_knowledge_covered=excluded.core_knowledge_covered,confidence_level=excluded.confidence_level,efficiency_status=excluded.efficiency_status,efficiency_sample_count=excluded.efficiency_sample_count,time_risk_flag=excluded.time_risk_flag,guessing_risk_flag=excluded.guessing_risk_flag,rule_version_id=excluded.rule_version_id,calculated_time=now(),row_version=cm_subject_profile.row_version+1,update_time=now() returning id</select>
+    <select id="insertSettlement" resultType="long">insert into cm_profile_settlement(id,user_id,goal_id,exam_subject_id,knowledge_point_id,settlement_type,source_session_id,settlement_revision_no,settlement_snapshot,entry_direct_ability,evidence_count,aggregate_evidence_value,positive_ratio,negative_ratio,effective_impact_coefficient,tentative_direct_ability,final_direct_ability,status,rule_version_id,request_id,settled_time)
+        values(#{id},#{userId},#{goalId},#{subjectId},#{knowledgePointId},'batch',#{sessionId},1,'{"schema_version":"diagnostic_settlement/1.0"}'::jsonb,50,#{count},#{ability},0,0,1,#{ability},#{ability},'settled',#{ruleVersionId},#{requestId},now())
+        on conflict(source_session_id,knowledge_point_id,settlement_revision_no) where settlement_type='batch' do update set id=cm_profile_settlement.id returning id</select>
+    <insert id="insertEvidence">insert into cm_learning_evidence(id,settlement_id,user_id,goal_id,session_id,attempt_id,exam_subject_id,knowledge_point_id,evidence_group_key,behavior_type,difficulty_snapshot,score_rate,raw_evidence_value,direction,hint_level,elapsed_seconds,timer_status,hint_coefficient,time_coefficient,combined_coefficient,behavior_coefficient,streak_coefficient,is_distinct_question,is_valid,rule_version_id,answered_at,effective_at,settlement_sequence)
+        values(#{id},#{settlementId},#{userId},#{goalId},#{sessionId},#{attemptId},#{subjectId},#{knowledgePointId},#{groupKey},'initial_diagnosis',#{difficulty},#{scoreRate},#{raw},#{direction},'none',#{elapsed},#{timerStatus},1,#{timeCoefficient},#{timeCoefficient},1,1,true,#{valid},#{ruleVersionId},now(),now(),#{sequence})
+        on conflict(attempt_id,knowledge_point_id) where is_valid=true do nothing</insert>
+    <insert id="insertKnowledgeChange">insert into cm_profile_change(id,profile_level,knowledge_profile_id,settlement_id,change_type,after_data,rule_version_id,request_id)
+        values(#{id},'knowledge',#{knowledgeProfileId},#{settlementId},'initialization',#{afterData}::jsonb,#{ruleVersionId},#{requestId}) on conflict(request_id) do nothing</insert>
+    <insert id="insertSubjectChange">insert into cm_profile_change(id,profile_level,subject_profile_id,change_type,after_data,rule_version_id,request_id)
+        values(#{id},'subject',#{subjectProfileId},'aggregation',#{afterData}::jsonb,#{ruleVersionId},#{requestId}) on conflict(request_id) do nothing</insert>
+    <insert id="insertOverallChange">insert into cm_profile_change(id,profile_level,overall_profile_id,change_type,after_data,rule_version_id,request_id)
+        values(#{id},'overall',#{overallProfileId},'aggregation',#{afterData}::jsonb,#{ruleVersionId},#{requestId}) on conflict(request_id) do nothing</insert>
+</mapper>

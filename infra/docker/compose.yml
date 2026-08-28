@@ -1,0 +1,84 @@
+name: certmuse-demo
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-certmuse}
+      POSTGRES_USER: ${POSTGRES_USER:-certmuse}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-certmuse_local}
+    ports:
+      - "${POSTGRES_PORT:-15432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:8-alpine
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:-certmuse_local}"]
+    ports:
+      - "${REDIS_PORT:-16379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a '$$REDIS_PASSWORD' ping | grep PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-certmuse_local}
+
+  backend:
+    build:
+      context: ../..
+      dockerfile: infra/docker/backend.Dockerfile
+    environment:
+      SPRING_PROFILES_ACTIVE: demo
+      CERTMUSE_DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-certmuse}?ApplicationName=certmuse-demo
+      CERTMUSE_DB_USERNAME: ${POSTGRES_USER:-certmuse}
+      CERTMUSE_DB_PASSWORD: ${POSTGRES_PASSWORD:-certmuse_local}
+      CERTMUSE_REDIS_HOST: redis
+      CERTMUSE_REDIS_PORT: "6379"
+      CERTMUSE_REDIS_DATABASE: "0"
+      CERTMUSE_REDIS_PASSWORD: ${REDIS_PASSWORD:-certmuse_local}
+      CERTMUSE_JWT_SECRET_KEY: ${CERTMUSE_JWT_SECRET_KEY:-certmuse-local-jwt-signing-key-change-before-public-use}
+      CERTMUSE_CAPTCHA_ENABLED: "false"
+      CERTMUSE_MESSAGE_ENABLED: "false"
+      JAVA_OPTS: ${JAVA_OPTS:--Xms256m -Xmx768m}
+    ports:
+      - "${BACKEND_PORT:-18080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 40s
+
+  frontend:
+    build:
+      context: ../..
+      dockerfile: infra/docker/frontend.Dockerfile
+    ports:
+      - "${FRONTEND_PORT:-13000}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres_data:
+  redis_data:

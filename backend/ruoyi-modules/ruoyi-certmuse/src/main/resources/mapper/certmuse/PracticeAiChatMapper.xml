@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.dromara.certmuse.assessment.mapper.PracticeAiChatMapper">
+    <select id="selectQuestionContext" resultType="org.dromara.certmuse.assessment.domain.PracticeAiQuestionContextRow">
+        select s.id session_id,s.user_id,sq.question_order,s.status session_status,
+               sq.presentation_snapshot::text,sq.grading_snapshot::text,sq.knowledge_snapshot::text,
+               a.id attempt_id,aa.answer_data::text,
+               case when aa.score_rate is null then null else aa.score_rate=1 end correct
+          from cm_learning_session s
+          join cm_session_question sq on sq.session_id=s.id
+          left join cm_question_attempt a on a.session_question_id=sq.id and a.user_id=s.user_id and a.status='submitted'
+          left join cm_attempt_answer aa on aa.attempt_id=a.id
+         where s.id=#{sessionId} and s.user_id=#{userId}
+           and s.session_type in ('self_practice','reinforcement_practice')
+           and sq.question_order=#{questionOrder}
+    </select>
+
+    <sql id="conversationColumns">
+        c.id,c.user_id,c.practice_session_id,c.question_order,c.status,c.provider,c.model_name,
+        c.create_time,c.update_time,
+        (select m.id from cm_ai_message m where m.conversation_id=c.id and m.role='ASSISTANT'
+          and m.status='GENERATING' order by m.sequence_no desc limit 1) generating_assistant_message_id
+    </sql>
+    <select id="selectConversationByItem" resultType="org.dromara.certmuse.assessment.domain.PracticeAiConversationRow">
+        select <include refid="conversationColumns"/> from cm_ai_conversation c
+         where c.user_id=#{userId} and c.practice_session_id=#{sessionId} and c.question_order=#{questionOrder}
+    </select>
+    <select id="selectOwnedConversation" resultType="org.dromara.certmuse.assessment.domain.PracticeAiConversationRow">
+        select <include refid="conversationColumns"/> from cm_ai_conversation c
+         where c.id=#{conversationId} and c.user_id=#{userId}
+    </select>
+    <select id="lockOwnedConversation" resultType="org.dromara.certmuse.assessment.domain.PracticeAiConversationRow">
+        select c.id,c.user_id,c.practice_session_id,c.question_order,c.status,c.provider,c.model_name,
+               c.create_time,c.update_time
+          from cm_ai_conversation c where c.id=#{conversationId} and c.user_id=#{userId} for update
+    </select>
+    <insert id="insertConversation">
+        insert into cm_ai_conversation(id,user_id,practice_session_id,question_order,status,provider,model_name)
+        values(#{id},#{userId},#{sessionId},#{questionOrder},'ACTIVE',#{provider},#{modelName})
+        on conflict (user_id,practice_session_id,question_order) do nothing
+    </insert>
+    <select id="countMessages" resultType="int">
+        select count(*)::int from cm_ai_message where conversation_id=#{conversationId}
+    </select>
+    <select id="selectMessages" resultType="org.dromara.certmuse.assessment.domain.PracticeAiMessageRow">
+        select * from (
+            select id,conversation_id,reply_to_message_id,sequence_no,role,content,status,
+                   answer_disclosure_mode,error_code,client_message_id,citations::text as citations,create_time,completed_time
+              from cm_ai_message where conversation_id=#{conversationId}
+              <if test="beforeSequence != null">and sequence_no &lt; #{beforeSequence}</if>
+             order by sequence_no desc limit #{limit}
+        ) page order by sequence_no
+    </select>
+    <select id="selectRecentMessages" resultType="org.dromara.certmuse.assessment.domain.PracticeAiMessageRow">
+        select * from (
+            select id,conversation_id,reply_to_message_id,sequence_no,role,content,status,
+                   answer_disclosure_mode,error_code,client_message_id,citations::text as citations,create_time,completed_time
+              from cm_ai_message where conversation_id=#{conversationId} and status='COMPLETED'
+             order by sequence_no desc limit #{limit}
+        ) recent order by sequence_no
+    </select>
+    <select id="selectUserMessageByClientId" resultType="org.dromara.certmuse.assessment.domain.PracticeAiMessageRow">
+        select id,conversation_id,reply_to_message_id,sequence_no,role,content,status,
+               answer_disclosure_mode,error_code,client_message_id,citations::text as citations,create_time,completed_time
+          from cm_ai_message where client_message_id=#{clientMessageId} and role='USER'
+    </select>
+    <select id="selectAssistantReply" resultType="org.dromara.certmuse.assessment.domain.PracticeAiMessageRow">
+        select id,conversation_id,reply_to_message_id,sequence_no,role,content,status,
+               answer_disclosure_mode,error_code,client_message_id,citations::text as citations,create_time,completed_time
+          from cm_ai_message where reply_to_message_id=#{userMessageId} and role='ASSISTANT'
+    </select>
+    <select id="selectOwnedAssistantMessage" resultType="org.dromara.certmuse.assessment.domain.PracticeAiMessageRow">
+        select m.id,m.conversation_id,m.reply_to_message_id,m.sequence_no,m.role,m.content,m.status,
+               m.answer_disclosure_mode,m.error_code,m.client_message_id,m.citations::text as citations,m.create_time,m.completed_time
+          from cm_ai_message m join cm_ai_conversation c on c.id=m.conversation_id
+         where m.id=#{messageId} and m.conversation_id=#{conversationId} and m.role='ASSISTANT' and c.user_id=#{userId}
+    </select>
+    <insert id="insertUserMessage">
+        insert into cm_ai_message(id,conversation_id,sequence_no,role,content,status,client_message_id,completed_time)
+        values(#{id},#{conversationId},#{sequence},'USER',#{content},'COMPLETED',#{clientMessageId},now())
+        on conflict do nothing
+    </insert>
+    <insert id="insertAssistantMessage">
+        insert into cm_ai_message(id,conversation_id,reply_to_message_id,sequence_no,role,content,status,answer_disclosure_mode)
+        values(#{id},#{conversationId},#{userMessageId},#{sequence},'ASSISTANT','','GENERATING',#{disclosureMode})
+        on conflict do nothing
+    </insert>
+    <update id="completeAssistantMessage">
+        update cm_ai_message set content=#{content},citations=cast(#{citations} as jsonb),status='COMPLETED',error_code=null,completed_time=now()
+         where id=#{id} and status='GENERATING'
+    </update>
+    <update id="failAssistantMessage">
+        update cm_ai_message set content='',status='FAILED',error_code=#{errorCode},completed_time=now()
+         where id=#{id} and status='GENERATING'
+    </update>
+    <update id="cancelAssistantMessage">
+        update cm_ai_message set content='',status='CANCELLED',error_code=null,completed_time=now()
+         where id=#{id} and status='GENERATING'
+    </update>
+    <select id="selectStaleGenerating" resultType="org.dromara.certmuse.assessment.domain.PracticeAiMessageRow">
+        select m.id,m.conversation_id,m.reply_to_message_id,m.sequence_no,m.role,m.content,m.status,
+               m.answer_disclosure_mode,m.error_code,m.client_message_id,m.citations::text as citations,m.create_time,m.completed_time,
+               c.user_id owner_user_id
+          from cm_ai_message m join cm_ai_conversation c on c.id=m.conversation_id
+         where m.status='GENERATING' and m.create_time &lt; now()-(#{seconds} * interval '1 second')
+    </select>
+    <update id="failStaleGenerating">
+        update cm_ai_message set content='',status='FAILED',error_code=#{errorCode},completed_time=now()
+         where id=#{id} and status='GENERATING'
+    </update>
+    <select id="selectIdempotency" resultType="org.dromara.certmuse.assessment.domain.PracticeAiIdempotencyRow">
+        select id,payload_hash,status,resource_id,response_body::text from cm_idempotency_record
+         where action_code=#{actionCode} and request_id=#{requestId}
+    </select>
+    <insert id="insertIdempotency">
+        insert into cm_idempotency_record(id,action_code,request_id,payload_hash,status,expires_time)
+        values(#{id},#{actionCode},#{requestId},#{payloadHash},'processing',now()+interval '24 hours')
+        on conflict do nothing
+    </insert>
+    <update id="succeedIdempotency">
+        update cm_idempotency_record set status='succeeded',resource_type=#{resourceType},resource_id=#{resourceId},
+               response_status=200,response_body=#{responseBody}::jsonb,update_time=now()
+         where id=#{id} and status='processing'
+    </update>
+</mapper>

@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.dromara.system.mapper.SysRoleMapper">
+
+    <select id="selectInvalidEntryUserIds" resultType="java.lang.Long">
+        with affected_users as (
+            select user_id from sys_user_role where role_id = #{roleId}
+        ), entry_stats as (
+            select ur.user_id,
+                   count(distinct r.entry_type) entry_type_count,
+                   bool_or(r.entry_type is null) has_unclassified_role,
+                   bool_or(r.entry_type = 'LEARNING') has_learning_role,
+                   bool_or(r.entry_type = 'ADMIN') has_admin_role,
+                   bool_or(r.role_key = 'student') has_student_role
+            from sys_user_role ur
+                     join affected_users au on au.user_id = ur.user_id
+                     join sys_role r on r.role_id = ur.role_id
+            where r.status = '0' and r.del_flag = '0'
+            group by ur.user_id
+        )
+        select es.user_id
+        from entry_stats es
+        where es.entry_type_count &gt; 1
+           or es.has_unclassified_role
+           or (
+               es.has_learning_role and (
+                   not es.has_student_role
+                   or not exists (
+                       select 1
+                       from sys_user_role ur
+                                join sys_role_menu rm on rm.role_id = ur.role_id
+                                join sys_menu m on m.menu_id = rm.menu_id
+                       where ur.user_id = es.user_id and m.perms = 'certmuse:student'
+                   )
+               )
+           )
+           or (
+               es.has_admin_role and not exists (
+                   select 1
+                   from sys_user_role ur
+                            join sys_role_menu rm on rm.role_id = ur.role_id
+                            join sys_menu m on m.menu_id = rm.menu_id
+                   where ur.user_id = es.user_id and m.perms = 'certmuse:entry:admin'
+               )
+           )
+    </select>
+
+</mapper>

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.dromara.certmuse.profile.mapper.LearningProfileQueryMapper">
+    <select id="selectCurrentOverallScore" resultType="org.dromara.certmuse.profile.domain.LearningProfileScoreRow">
+        select c.certification_name,
+               op.overall_ability overall_score,
+               op.calculated_time
+          from cm_user_goal g
+          join cm_exam_certification c on c.id = g.certification_id
+          left join cm_overall_profile op
+            on op.user_id = g.user_id
+           and op.goal_id = g.id
+         where g.user_id = #{userId}
+           and g.status in ('active', 'paused')
+         order by case g.status when 'active' then 0 else 1 end,
+                  g.update_time desc,
+                  g.id desc
+         limit 1
+    </select>
+</mapper>

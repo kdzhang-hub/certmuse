@@ -1,0 +1,317 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.dromara.certmuse.learning.mapper.LearningTaskMapper">
+    <sql id="incompleteTask">
+        (select count(*) from cm_task_item required_item
+          where required_item.task_id=t.id
+            and required_item.item_order in (1,2)
+            and exists (select 1 from cm_task_attempt a where a.task_item_id=required_item.id
+                         and a.attempt_no=1 and a.status='completed')) &lt; 2
+    </sql>
+
+    <select id="selectActiveGoal" resultType="org.dromara.certmuse.learning.domain.LearningTaskGoalRow">
+        select id,user_id,certification_id,syllabus_version_id,target_exam_year,target_exam_month
+          from cm_user_goal where user_id=#{userId} and status='active'
+         order by update_time desc,id desc limit 1
+    </select>
+    <select id="lockActiveGoal" resultType="org.dromara.certmuse.learning.domain.LearningTaskGoalRow">
+        select id,user_id,certification_id,syllabus_version_id,target_exam_year,target_exam_month
+          from cm_user_goal where user_id=#{userId} and status='active'
+         order by update_time desc,id desc limit 1 for update
+    </select>
+    <select id="lockGoalById" resultType="org.dromara.certmuse.learning.domain.LearningTaskGoalRow">
+        select id,user_id,certification_id,syllabus_version_id,target_exam_year,target_exam_month
+          from cm_user_goal where id=#{goalId} and status='active' for update
+    </select>
+    <select id="selectActiveGoalIds" resultType="long">
+        select id from cm_user_goal where status='active' order by id offset #{offset} limit #{limit}
+    </select>
+    <select id="countIncompleteTasks" resultType="int">
+        select count(*)::int from cm_learning_task t
+         where t.user_id=#{userId} and t.goal_id=#{goalId} and <include refid="incompleteTask"/>
+    </select>
+    <select id="countTaskPage" resultType="long">
+        select count(*) from cm_learning_task t
+         where t.user_id=#{userId} and t.goal_id=#{goalId} and <include refid="incompleteTask"/>
+         <if test="keyword != null">
+           and (t.display_snapshot-&gt;&gt;'title' ilike concat('%',#{keyword},'%')
+             or t.display_snapshot-&gt;&gt;'knowledgePoint' ilike concat('%',#{keyword},'%'))
+         </if>
+    </select>
+    <select id="selectTaskPage" resultType="org.dromara.certmuse.learning.domain.vo.LearningTaskListItemVo">
+        select t.id::text id,t.display_snapshot-&gt;&gt;'title' title,
+               t.display_snapshot-&gt;&gt;'knowledgePoint' knowledge_point,
+               coalesce((question_item.target_data-&gt;&gt;'questionCount')::int,0) question_count,
+               coalesce(progress.submitted_count,0) completed_question_count,
+               t.estimated_minutes,
+               greatest(t.update_time,coalesce(progress.attempt_updated,t.update_time),
+                        coalesce(progress.session_updated,t.update_time),coalesce(progress.question_updated,t.update_time)) updated_at,
+               t.display_snapshot-&gt;&gt;'recommendation' recommendation,
+               case when progress.session_id is null and not progress.has_attempt then 'START' else 'CONTINUE' end action
+          from cm_learning_task t
+          join cm_task_item question_item on question_item.task_id=t.id
+             and question_item.item_order=2 and question_item.item_type='question'
+          left join lateral (
+              select (select max(s.id) from cm_learning_session s where s.source_task_id=t.id
+                       and s.user_id=#{userId} and s.goal_id=#{goalId} and s.session_type='daily_task') session_id,
+                     exists(select 1 from cm_task_item ti join cm_task_attempt ta on ta.task_item_id=ti.id
+                             where ti.task_id=t.id) has_attempt,
+                     (select count(distinct qa.id)::int from cm_learning_session s
+                       join cm_session_question sq on sq.session_id=s.id
+                       join cm_question_attempt qa on qa.session_question_id=sq.id and qa.user_id=#{userId}
+                      where s.source_task_id=t.id and s.session_type='daily_task' and qa.status='submitted') submitted_count,
+                     (select max(a.completed_time) from cm_task_item ti join cm_task_attempt a on a.task_item_id=ti.id
+                       where ti.task_id=t.id) attempt_updated,
+                     (select max(s.update_time) from cm_learning_session s where s.source_task_id=t.id
+                       and s.session_type='daily_task') session_updated,
+                     (select max(qa.update_time) from cm_learning_session s join cm_session_question sq on sq.session_id=s.id
+                       join cm_question_attempt qa on qa.session_question_id=sq.id where s.source_task_id=t.id) question_updated
+          ) progress on true
+         where t.user_id=#{userId} and t.goal_id=#{goalId} and <include refid="incompleteTask"/>
+         <if test="keyword != null">
+           and (t.display_snapshot-&gt;&gt;'title' ilike concat('%',#{keyword},'%')
+             or t.display_snapshot-&gt;&gt;'knowledgePoint' ilike concat('%',#{keyword},'%'))
+         </if>
+         order by t.create_time,t.id offset #{offset} limit #{limit}
+    </select>
+    <select id="lockActiveDailySession" resultType="org.dromara.certmuse.learning.domain.LearningTaskSessionRow">
+        select s.id,s.source_task_id,s.status,
+               exists(select 1 from cm_task_item ti join cm_task_attempt a on a.task_item_id=ti.id
+                       where ti.task_id=s.source_task_id and ti.item_order=1 and a.attempt_no=1 and a.status='completed') learning_completed
+          from cm_learning_session s
+         where s.user_id=#{userId} and s.goal_id=#{goalId} and s.session_type='daily_task'
+           and s.status in ('created','in_progress','submitted','settling')
+         order by s.create_time,s.id limit 1 for update
+    </select>
+    <select id="lockOwnedTask" resultType="org.dromara.certmuse.learning.domain.LearningTaskRow">
+        select t.id,t.user_id,t.goal_id,t.exam_subject_id,t.rule_version_id,
+               (select ti.id from cm_task_item ti where ti.task_id=t.id and ti.item_order=1 and ti.item_type='knowledge') knowledge_item_id,
+               (select ti.id from cm_task_item ti where ti.task_id=t.id and ti.item_order=2 and ti.item_type='question') question_item_id,
+               coalesce((select (ti.target_data-&gt;&gt;'questionCount')::int from cm_task_item ti
+                         where ti.task_id=t.id and ti.item_order=2),0) question_count,
+               (select count(*) from cm_task_item ti where ti.task_id=t.id and ti.item_order in(1,2)
+                 and exists(select 1 from cm_task_attempt a where a.task_item_id=ti.id
+                            and a.attempt_no=1 and a.status='completed'))=2 completed
+          from cm_learning_task t
+         where t.id=#{taskId} and t.user_id=#{userId} and t.goal_id=#{goalId}
+         for update
+    </select>
+    <select id="selectOwnedLearningContent" resultType="org.dromara.certmuse.learning.domain.LearningTaskContentRow">
+        select t.id task_id,ti.estimated_minutes,ti.target_data::text target_data
+          from cm_learning_task t join cm_task_item ti on ti.task_id=t.id
+         where t.id=#{taskId} and t.user_id=#{userId} and t.goal_id=#{goalId}
+           and ti.item_order=1 and ti.item_type='knowledge'
+    </select>
+    <select id="selectTaskSession" resultType="org.dromara.certmuse.learning.domain.LearningTaskSessionRow">
+        select s.id,s.source_task_id,s.status,
+               exists(select 1 from cm_task_item ti join cm_task_attempt a on a.task_item_id=ti.id
+                       where ti.task_id=s.source_task_id and ti.item_order=1 and a.attempt_no=1 and a.status='completed') learning_completed
+          from cm_learning_session s
+         where s.user_id=#{userId} and s.goal_id=#{goalId} and s.source_task_id=#{taskId}
+           and s.session_type='daily_task' order by s.id limit 1
+    </select>
+    <insert id="insertSession">
+        insert into cm_learning_session(id,user_id,goal_id,exam_subject_id,session_type,status,rule_version_id,
+            request_id,source_task_id,certification_id,syllabus_version_id,target_exam_year,target_exam_month,row_version)
+        values(#{id},#{userId},#{goal.id},#{task.examSubjectId},'daily_task','created',#{task.ruleVersionId},
+            #{requestId},#{task.id},#{goal.certificationId},#{goal.syllabusVersionId},#{goal.targetExamYear},
+            #{goal.targetExamMonth},0) on conflict do nothing
+    </insert>
+    <select id="selectTaskQuestions" resultType="org.dromara.certmuse.learning.domain.LearningTaskQuestionRow">
+        select question_id,question_revision_id,exam_subject_id,evidence_group_key,difficulty_snapshot difficulty,
+               estimated_seconds_snapshot estimated_seconds,presentation_snapshot::text,grading_snapshot::text,
+               knowledge_snapshot::text
+          from cm_task_question where task_item_id=#{taskItemId} order by question_order
+    </select>
+    <insert id="insertSessionQuestion">
+        insert into cm_session_question(id,session_id,question_id,question_revision_id,exam_subject_id,question_order,
+            evidence_group_key,difficulty_snapshot,estimated_seconds_snapshot,presentation_snapshot,grading_snapshot,
+            knowledge_snapshot,hint_allowed)
+        values(#{id},#{sessionId},#{question.questionId},#{question.questionRevisionId},#{question.examSubjectId},
+            #{order},#{question.evidenceGroupKey},#{question.difficulty},#{question.estimatedSeconds},
+            #{question.presentationSnapshot}::jsonb,#{question.gradingSnapshot}::jsonb,
+            #{question.knowledgeSnapshot}::jsonb,true)
+        on conflict do nothing
+    </insert>
+    <insert id="insertTaskAttempt">
+        insert into cm_task_attempt(id,task_item_id,session_id,attempt_no,status,started_time)
+        values(#{id},#{taskItemId},#{sessionId},1,'started',now()) on conflict do nothing
+    </insert>
+    <update id="startPracticeSession">
+        update cm_learning_session set status='in_progress',started_time=coalesce(started_time,now()),
+               status_changed_time=now(),update_time=now() where id=#{sessionId} and status='created'
+    </update>
+    <update id="completeLearningAttempt">
+        update cm_task_attempt set status='completed',completed_time=coalesce(completed_time,now()),update_time=now()
+         where task_item_id=#{taskItemId} and session_id=#{sessionId} and attempt_no=1 and status='started'
+    </update>
+    <update id="completePracticeItem">
+        update cm_task_attempt a set status='completed',completed_time=coalesce(completed_time,now()),update_time=now()
+          from cm_task_item ti,cm_learning_task t,cm_learning_session s,cm_user_goal g
+         where a.task_item_id=ti.id and ti.task_id=t.id and s.id=a.session_id and s.source_task_id=t.id
+           and g.id=s.goal_id and g.user_id=#{userId} and g.status='active'
+           and s.id=#{sessionId} and s.user_id=#{userId} and s.session_type='daily_task'
+           and ti.item_type='question' and ti.item_order=2 and a.attempt_no=1 and a.status='started'
+           and exists(select 1 from cm_task_item li join cm_task_attempt la on la.task_item_id=li.id
+                       where li.task_id=t.id and li.item_type='knowledge' and li.item_order=1
+                         and la.session_id=s.id and la.attempt_no=1 and la.status='completed')
+    </update>
+    <select id="selectIdempotency" resultType="org.dromara.certmuse.learning.domain.LearningTaskIdempotencyRow">
+        select id,payload_hash,status,resource_id,response_status,response_body::text from cm_idempotency_record
+         where action_code=#{actionCode} and request_id=#{requestId}
+    </select>
+    <insert id="insertIdempotency">
+        insert into cm_idempotency_record(id,action_code,request_id,payload_hash,status,expires_time)
+        values(#{id},#{actionCode},#{requestId},#{payloadHash},'processing',now()+interval '24 hours')
+        on conflict do nothing
+    </insert>
+    <update id="succeedIdempotency">
+        update cm_idempotency_record set status='succeeded',resource_type=#{resourceType},resource_id=#{resourceId},
+               response_status=200,response_body=#{responseBody}::jsonb,update_time=now()
+         where id=#{id} and status='processing'
+    </update>
+    <update id="failIdempotency">
+        update cm_idempotency_record set status='failed',response_status=#{responseStatus},
+               response_body=#{responseBody}::jsonb,update_time=now() where id=#{id} and status='processing'
+    </update>
+    <select id="selectUniquePublishedRuleVersion" resultType="long">
+        select min(id) from cm_profile_rule_version where status='published' having count(*)=1
+    </select>
+    <select id="countPublishedRuleVersions" resultType="int">
+        select count(*)::int from cm_profile_rule_version where status='published'
+    </select>
+    <insert id="insertBatch">
+        insert into cm_task_replenishment_batch(id,user_id,goal_id,trigger_type,before_available_count,
+            requested_count,created_count,rule_version_id,algorithm_version,input_snapshot,result_summary,status,
+            request_id,generation_key)
+        values(#{id},#{userId},#{goalId},#{triggerType},#{beforeCount},#{requestedCount},0,#{ruleVersionId},
+            'TASK_RECOMMENDATION_V1',#{inputSnapshot}::jsonb,'{"schema_version":"1.0","createdTaskIds":[]}'::jsonb,
+            'generating',#{requestId},#{generationKey}) on conflict(generation_key) do nothing
+    </insert>
+    <select id="selectBatchIdByGenerationKey" resultType="long">
+        select id from cm_task_replenishment_batch where generation_key=#{generationKey}
+    </select>
+    <update id="restartFailedBatch">
+        update cm_task_replenishment_batch set status='generating',before_available_count=#{beforeCount},
+               requested_count=#{requestedCount},created_count=0,rule_version_id=#{ruleVersionId},
+               input_snapshot=#{inputSnapshot}::jsonb,
+               result_summary='{"schema_version":"1.0","createdTaskIds":[]}'::jsonb,
+               failure_reason=null,update_time=now()
+         where generation_key=#{generationKey} and status='failed'
+    </update>
+    <select id="selectCandidates" resultType="org.dromara.certmuse.learning.domain.LearningTaskCandidateRow">
+        select kp.id knowledge_point_id,kp.exam_subject_id,kp.syllabus_title knowledge_name,
+               coalesce(profile.profile_status,'unassessed') profile_status,
+                jsonb_build_object('schema_version',#{learningContentSchemaVersion},
+                   'title',concat(kp.syllabus_title,'专项学习'),'knowledgePoint',kp.syllabus_title,
+                   'sections',content.blocks)::text content_snapshot
+          from cm_knowledge_point kp
+          left join cm_knowledge_profile profile on profile.user_id=#{userId} and profile.goal_id=#{goalId}
+             and profile.knowledge_point_id=kp.id
+          join lateral (
+              select jsonb_agg(jsonb_build_object('order',c.section_order,
+                       'title',coalesce(c.heading,d.title),'content',c.content,
+                       'images',coalesce((select jsonb_agg(jsonb_build_object('stableId',im.id::text,
+                           'storagePath',im.storage_path,'altText',im.alt_text,'sortOrder',im.image_order)
+                           order by im.image_order,im.id) from cm_document_image im where im.chunk_id=c.id),'[]'::jsonb))
+                       order by c.section_order) blocks
+                from (select c.*,row_number() over(order by c.chunk_order,c.id)::int section_order
+                        from cm_chunk_knowledge ck join cm_document_chunk c on c.id=ck.chunk_id
+                       join cm_document d0 on d0.id=c.document_id
+                      where ck.knowledge_point_id=kp.id and d0.status='published' and d0.del_flag='0'
+                      order by c.chunk_order,c.id limit 3) c
+                join cm_document d on d.id=c.document_id
+          ) content on jsonb_array_length(content.blocks)&gt;0
+         where kp.syllabus_version_id=#{syllabusVersionId} and kp.status='0' and kp.del_flag='0'
+           and kp.recommendation_enabled=true
+           and not exists(select 1 from cm_learning_task t join cm_task_item ti on ti.task_id=t.id
+                           where t.user_id=#{userId} and t.goal_id=#{goalId} and ti.knowledge_point_id=kp.id
+                             and <include refid="incompleteTask"/>)
+           and (select count(distinct qk.question_id) from cm_question_knowledge qk
+                join cm_question q on q.id=qk.question_id and q.del_flag='0'
+                join cm_question_revision r on r.id=qk.question_revision_id and r.status='published'
+               where qk.knowledge_point_id=kp.id and r.question_type='CHOICE'
+                 and jsonb_typeof(r.answer)='object' and jsonb_typeof(r.answer-&gt;'value')='array'
+                 and jsonb_exists(r.answer, 'schema_version') and r.answer-&gt;&gt;'answer_type'='option_keys'
+                 and r.answer-&gt;&gt;'selection_mode'='single' and jsonb_array_length(r.answer-&gt;'value')=1
+                 and exists(select 1 from cm_question_option o where o.question_revision_id=r.id)
+                 and not exists(select 1 from jsonb_array_elements_text(r.answer-&gt;'value') answer(label)
+                     where not exists(select 1 from cm_question_option o where o.question_revision_id=r.id
+                                                and o.option_label=answer.label))) &gt;= 1
+         order by case coalesce(profile.profile_status,'unassessed')
+             when 'urgent' then 1 when 'weak' then 2 when 'needs_retest' then 3
+             when 'pending_verification' then 4 when 'needs_review' then 5 when 'expired' then 6
+             when 'unassessed' then 7 when 'provisional' then 8 when 'learning' then 9
+             when 'proficient' then 10 when 'mastery_candidate' then 11 when 'mastered' then 12 else 13 end,
+             kp.importance desc,kp.id limit #{limit}
+    </select>
+    <select id="selectCandidateQuestions" resultType="org.dromara.certmuse.learning.domain.LearningTaskQuestionRow">
+        with eligible as (
+            select distinct on(q.id) q.id question_id,r.id question_revision_id,q.exam_subject_id,
+                   coalesce(nullif(btrim(q.evidence_group_key),''),concat('Q:',q.id)) evidence_group_key,
+                   coalesce(r.difficulty,'medium') difficulty,coalesce(r.estimated_seconds,60) estimated_seconds,
+                   jsonb_build_object('schema_version','1.0','questionType','CHOICE','stem',r.stem,
+                       'options',coalesce((select jsonb_agg(jsonb_build_object('label',o.option_label,'content',o.option_text,
+                           'sortOrder',o.sort_order) order by o.sort_order,o.id) from cm_question_option o
+                           where o.question_revision_id=r.id),'[]'::jsonb),
+                       'images',coalesce((select jsonb_agg(jsonb_build_object('sourceUrl',im.source_url,
+                           'storagePath',im.storage_path,'altText',im.alt_text,'sortOrder',im.image_order)
+                           order by im.image_order,im.id) from cm_question_image im
+                           where im.question_revision_id=r.id),'[]'::jsonb))::text presentation_snapshot,
+                   jsonb_build_object('schema_version','1.0','questionType','CHOICE','answer',r.answer,
+                       'analysis',r.analysis,'rules',jsonb_build_object('selectionMode','single'))::text grading_snapshot,
+                   jsonb_build_object('schema_version','1.0','items',jsonb_build_array(jsonb_build_object(
+                       'knowledgePointId',#{knowledgePointId}::text,
+                       'knowledgePointName',(select kp.syllabus_title from cm_knowledge_point kp where kp.id=#{knowledgePointId}),
+                       'examSubjectId',q.exam_subject_id::text)))::text knowledge_snapshot,
+                   last_submit.last_submitted
+              from cm_question_knowledge qk join cm_question q on q.id=qk.question_id and q.del_flag='0'
+              join cm_question_revision r on r.id=qk.question_revision_id and r.status='published'
+              left join lateral (select max(qa.submitted_time) last_submitted from cm_session_question sq
+                  join cm_question_attempt qa on qa.session_question_id=sq.id and qa.user_id=#{userId}
+                 where sq.question_id=q.id and qa.status='submitted') last_submit on true
+             where qk.knowledge_point_id=#{knowledgePointId} and r.question_type='CHOICE'
+               and jsonb_typeof(r.answer)='object' and jsonb_typeof(r.answer-&gt;'value')='array'
+               and jsonb_exists(r.answer, 'schema_version') and r.answer-&gt;&gt;'answer_type'='option_keys'
+               and r.answer-&gt;&gt;'selection_mode'='single' and jsonb_array_length(r.answer-&gt;'value')=1
+               and exists(select 1 from cm_question_option o where o.question_revision_id=r.id)
+               and not exists(select 1 from jsonb_array_elements_text(r.answer-&gt;'value') answer(label)
+                   where not exists(select 1 from cm_question_option o where o.question_revision_id=r.id
+                                    and o.option_label=answer.label))
+               and not exists(select 1 from cm_learning_task t join cm_task_item ti on ti.task_id=t.id
+                   join cm_task_question tq on tq.task_item_id=ti.id and tq.question_id=q.id
+                  where t.user_id=#{userId} and t.goal_id=#{goalId} and <include refid="incompleteTask"/>)
+             order by q.id,r.revision_no desc,r.id desc
+        )
+        select * from eligible order by (last_submitted is null) desc,last_submitted asc,question_id limit #{limit}
+    </select>
+    <insert id="insertTask">
+        insert into cm_learning_task(id,user_id,goal_id,exam_subject_id,task_type,estimated_minutes,completion_rule,
+            profile_snapshot,rule_version_id,request_id,replenishment_batch_id,display_snapshot)
+        values(#{id},#{userId},#{goalId},#{candidate.examSubjectId},'knowledge_bundle',#{estimatedMinutes},
+            '{"schema_version":"1.0","requiredItemOrders":[1,2]}'::jsonb,#{profileSnapshot}::jsonb,
+            #{ruleVersionId},concat('TASK_SUPPLEMENT:',#{batchId},':',#{ordinal}),#{batchId},#{displaySnapshot}::jsonb)
+    </insert>
+    <insert id="insertTaskItem">
+        insert into cm_task_item(id,task_id,item_order,item_type,exam_subject_id,knowledge_point_id,target_data,estimated_minutes)
+        values(#{id},#{taskId},#{order},#{type},#{candidate.examSubjectId},#{candidate.knowledgePointId},
+               #{targetData}::jsonb,#{estimatedMinutes})
+    </insert>
+    <insert id="insertTaskQuestion">
+        insert into cm_task_question(id,task_item_id,question_id,question_revision_id,exam_subject_id,question_order,
+            evidence_group_key,difficulty_snapshot,estimated_seconds_snapshot,presentation_snapshot,grading_snapshot,
+            knowledge_snapshot)
+        values(#{id},#{taskItemId},#{question.questionId},#{question.questionRevisionId},#{question.examSubjectId},
+            #{order},#{question.evidenceGroupKey},#{question.difficulty},#{question.estimatedSeconds},
+            #{question.presentationSnapshot}::jsonb,#{question.gradingSnapshot}::jsonb,
+            #{question.knowledgeSnapshot}::jsonb)
+    </insert>
+    <update id="completeBatch">
+        update cm_task_replenishment_batch set created_count=#{createdCount},result_summary=#{resultSummary}::jsonb,
+            status='available',failure_reason=null,update_time=now() where id=#{id}
+    </update>
+    <update id="failBatch">
+        update cm_task_replenishment_batch set status='failed',failure_reason=#{failureReason},
+            result_summary=#{resultSummary}::jsonb,update_time=now() where id=#{id}
+    </update>
+</mapper>

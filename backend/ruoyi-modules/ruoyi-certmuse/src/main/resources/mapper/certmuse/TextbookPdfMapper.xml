@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.dromara.certmuse.catalog.mapper.TextbookPdfMapper">
+    <resultMap id="pdfRow" type="org.dromara.certmuse.catalog.domain.TextbookPdfRow">
+        <constructor><arg column="document_id" javaType="java.lang.Long"/><arg column="title" javaType="String"/><arg column="status" javaType="String"/>
+            <arg column="object_key" javaType="String"/><arg column="file_name" javaType="String"/><arg column="file_size" javaType="java.lang.Long"/>
+            <arg column="file_hash" javaType="String"/><arg column="uploaded_by" javaType="java.lang.Long"/><arg column="uploaded_time" javaType="java.time.OffsetDateTime"/></constructor>
+    </resultMap>
+    <sql id="adminWhere">d.id=#{documentId} and d.document_type='textbook' and d.del_flag='0'<if test="visibleUserId != null"> and d.create_by=#{visibleUserId}</if></sql>
+    <select id="selectAdmin" resultMap="pdfRow">
+        select d.id document_id,d.title,d.status,p.object_key,p.file_name,p.file_size,p.file_hash,p.uploaded_by,p.uploaded_time
+        from cm_document d left join cm_textbook_original_pdf p on p.document_id=d.id where <include refid="adminWhere"/>
+    </select>
+    <select id="lockAdmin" resultMap="pdfRow">
+        select d.id document_id,d.title,d.status,p.object_key,p.file_name,p.file_size,p.file_hash,p.uploaded_by,p.uploaded_time
+        from cm_document d left join cm_textbook_original_pdf p on p.document_id=d.id where <include refid="adminWhere"/> for update of d
+    </select>
+    <select id="selectLearner" resultMap="pdfRow">
+        select d.id document_id,d.title,d.status,p.object_key,p.file_name,p.file_size,p.file_hash,p.uploaded_by,p.uploaded_time
+        from cm_document d join cm_textbook_original_pdf p on p.document_id=d.id
+        where d.document_type='textbook' and d.status='published' and d.del_flag='0' and d.id=#{documentId}
+          and d.certification_id=(select g.certification_id from cm_user_goal g where g.user_id=#{userId} and g.status='active'
+            order by g.update_time desc,g.id desc limit 1)
+    </select>
+    <select id="selectLearnerList" resultType="org.dromara.certmuse.catalog.domain.vo.LearningTextbookPdfListItemVo">
+        select cast(d.id as varchar) id,d.title,d.edition,sv.version_name syllabus_version_name,p.file_name,p.file_size,p.uploaded_time
+        from cm_document d join cm_textbook_original_pdf p on p.document_id=d.id left join cm_syllabus_version sv on sv.id=d.syllabus_version_id
+        where d.document_type='textbook' and d.status='published' and d.del_flag='0'
+          and d.certification_id=(select g.certification_id from cm_user_goal g where g.user_id=#{userId} and g.status='active'
+            order by g.update_time desc,g.id desc limit 1)<if test="keyword != null"> and d.title ilike concat('%',#{keyword},'%')</if>
+        order by d.update_time desc,d.id desc
+    </select>
+    <select id="selectPublicCertifications" resultType="org.dromara.certmuse.catalog.domain.vo.PublicTextbookCertificationVo">
+        select cast(c.id as varchar) id,c.certification_name name
+        from cm_exam_certification c
+        where c.status='0'
+        order by c.certification_name,c.id
+    </select>
+    <select id="selectPublicList" resultType="org.dromara.certmuse.catalog.domain.vo.PublicTextbookPdfListItemVo">
+        select cast(d.id as varchar) id,d.title,d.edition,sv.version_name syllabus_version_name,p.file_name,p.file_size,p.uploaded_time
+        from cm_document d join cm_textbook_original_pdf p on p.document_id=d.id
+        join cm_exam_certification c on c.id=d.certification_id and c.status='0'
+        left join cm_syllabus_version sv on sv.id=d.syllabus_version_id
+        where d.document_type='textbook' and d.status='published' and d.del_flag='0' and d.certification_id=#{certificationId}
+        <if test="keyword != null">and d.title ilike concat('%',#{keyword},'%')</if>
+        order by d.update_time desc,d.id desc
+    </select>
+    <select id="selectPublic" resultMap="pdfRow">
+        select d.id document_id,d.title,d.status,p.object_key,p.file_name,p.file_size,p.file_hash,p.uploaded_by,p.uploaded_time
+        from cm_document d join cm_textbook_original_pdf p on p.document_id=d.id
+        join cm_exam_certification c on c.id=d.certification_id and c.status='0'
+        where d.document_type='textbook' and d.status='published' and d.del_flag='0' and d.id=#{documentId}
+    </select>
+    <insert id="upsert">
+        insert into cm_textbook_original_pdf(id,document_id,object_key,file_name,file_size,file_hash,uploaded_by,uploaded_time,create_time,update_time)
+        values(#{id},#{documentId},#{objectKey},#{fileName},#{fileSize},#{fileHash},#{userId},now(),now(),now())
+        on conflict(document_id) do update set object_key=excluded.object_key,file_name=excluded.file_name,file_size=excluded.file_size,
+        file_hash=excluded.file_hash,uploaded_by=excluded.uploaded_by,uploaded_time=now(),update_time=now()
+    </insert>
+    <delete id="delete">
+        delete from cm_textbook_original_pdf where document_id=#{documentId}
+    </delete>
+</mapper>

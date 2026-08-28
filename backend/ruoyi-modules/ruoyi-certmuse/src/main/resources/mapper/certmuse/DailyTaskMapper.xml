@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.dromara.certmuse.assessment.mapper.DailyTaskMapper">
+    <sql id="ownedActiveGoal">
+        s.user_id=#{userId} and s.session_type='daily_task'
+        and exists(select 1 from cm_user_goal g where g.id=s.goal_id and g.user_id=#{userId} and g.status='active')
+    </sql>
+    <select id="selectSession" resultType="org.dromara.certmuse.assessment.domain.KnowledgePracticeAnsweringSessionRow">
+        select s.id,s.user_id,s.goal_id,s.rule_version_id,s.status,max(t.display_snapshot-&gt;&gt;'title') task_title,count(distinct sq.id)::int total_count,
+               count(distinct a.id) filter(where a.status='submitted')::int submitted_count
+          from cm_learning_session s join cm_learning_task t on t.id=s.source_task_id and t.user_id=s.user_id
+          left join cm_session_question sq on sq.session_id=s.id
+          left join cm_question_attempt a on a.session_question_id=sq.id and a.user_id=s.user_id and a.status='submitted'
+         where s.id=#{sessionId} and <include refid="ownedActiveGoal"/> group by s.id
+    </select>
+    <select id="lockSession" resultType="org.dromara.certmuse.assessment.domain.KnowledgePracticeAnsweringSessionRow">
+        select s.id,s.user_id,s.goal_id,s.rule_version_id,s.status from cm_learning_session s
+         where s.id=#{sessionId} and <include refid="ownedActiveGoal"/> for update
+    </select>
+    <select id="selectNavigation" resultType="org.dromara.certmuse.assessment.domain.KnowledgePracticeNavigationRow">
+        select sq.question_order,a.id is not null submitted,case when a.id is null then null else aa.score_rate=1 end correct
+          from cm_session_question sq left join cm_question_attempt a on a.session_question_id=sq.id and a.status='submitted'
+          left join cm_attempt_answer aa on aa.attempt_id=a.id where sq.session_id=#{sessionId} order by sq.question_order
+    </select>
+    <select id="selectItem" resultType="org.dromara.certmuse.assessment.domain.KnowledgePracticeItemRow">
+        select sq.id session_question_id,s.id session_id,s.user_id,s.goal_id,s.rule_version_id,sq.exam_subject_id,
+               sq.evidence_group_key,sq.difficulty_snapshot,sq.question_order,s.status session_status,
+               (select count(*) from cm_session_question x where x.session_id=s.id)::int total_count,
+               sq.presentation_snapshot::text,sq.grading_snapshot::text,sq.knowledge_snapshot::text,
+               a.id attempt_id,aa.answer_data::text,case when aa.score_rate is null then null else aa.score_rate=1 end correct
+          from cm_learning_session s join cm_session_question sq on sq.session_id=s.id
+          left join cm_question_attempt a on a.session_question_id=sq.id and a.user_id=s.user_id and a.status='submitted'
+          left join cm_attempt_answer aa on aa.attempt_id=a.id
+         where s.id=#{sessionId} and <include refid="ownedActiveGoal"/> and sq.question_order=#{questionOrder}
+    </select>
+    <select id="selectIdempotency" resultType="org.dromara.certmuse.assessment.domain.KnowledgePracticeIdempotencyRow">
+        select id,payload_hash,status,resource_id,response_body::text from cm_idempotency_record
+         where action_code=#{actionCode} and request_id=#{requestId}
+    </select>
+    <insert id="insertIdempotency">
+        insert into cm_idempotency_record(id,action_code,request_id,payload_hash,status,expires_time)
+        values(#{id},#{actionCode},#{requestId},#{payloadHash},'processing',now()+interval '24 hours') on conflict do nothing
+    </insert>
+    <update id="succeedIdempotency">
+        update cm_idempotency_record set status='succeeded',resource_type=#{resourceType},resource_id=#{resourceId},
+               response_status=200,response_body=#{responseBody}::jsonb,update_time=now() where id=#{id} and status='processing'
+    </update>
+    <insert id="insertAttempt">
+        insert into cm_question_attempt(id,session_question_id,user_id,attempt_no,status,create_request_id,submit_request_id,
+            submitted_time,timer_status,is_blank,is_skipped,is_first_attempt,is_repeat_attempt)
+        values(#{id},#{sessionQuestionId},#{userId},1,'submitted',#{requestId},#{requestId},now(),'missing',false,false,true,false)
+        on conflict do nothing
+    </insert>
+    <insert id="insertAttemptAnswer">
+        insert into cm_attempt_answer(id,attempt_id,answer_data,score,max_score,score_rate,grading_status,graded_time)
+        values(#{id},#{attemptId},#{answerData}::jsonb,case when #{correct} then 1 else 0 end,1,
+               case when #{correct} then 1 else 0 end,'graded',now())
+    </insert>
+    <select id="countSubmittedItems" resultType="int">
+        select count(*) from cm_question_attempt a join cm_session_question sq on sq.id=a.session_question_id
+         where sq.session_id=#{sessionId} and a.status='submitted'
+    </select>
+    <update id="submitSession">
+        update cm_learning_session set status='submitted',submitted_time=coalesce(submitted_time,now()),
+               status_changed_time=now(),update_time=now()
+         where id=#{sessionId} and user_id=#{userId} and session_type='daily_task' and status='in_progress'
+    </update>
+    <update id="settleSession">
+        update cm_learning_session set status='settling',status_changed_time=now(),update_time=now()
+         where id=#{sessionId} and user_id=#{userId} and session_type='daily_task' and status='submitted'
+    </update>
+    <update id="completeSession">
+        update cm_learning_session set status='completed',settled_time=coalesce(settled_time,now()),
+               status_changed_time=now(),update_time=now()
+         where id=#{sessionId} and user_id=#{userId} and session_type='daily_task' and status='settling'
+    </update>
+</mapper>

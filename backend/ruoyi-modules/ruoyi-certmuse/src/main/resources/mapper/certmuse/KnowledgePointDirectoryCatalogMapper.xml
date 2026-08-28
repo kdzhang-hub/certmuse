@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.dromara.certmuse.catalog.mapper.KnowledgePointDirectoryCatalogMapper">
+    <select id="selectForCurrentGoal" resultType="org.dromara.certmuse.catalog.domain.KnowledgePointDirectoryRow">
+        with current_goal as (
+            select g.id as goal_id, g.certification_id, g.syllabus_version_id
+              from cm_user_goal g
+             where g.user_id = #{userId}
+               and g.status in ('active', 'paused')
+             order by case g.status when 'active' then 0 else 1 end, g.update_time desc, g.id desc
+             limit 1
+        ), matched as (
+            select kp.id, kp.syllabus_number, kp.syllabus_title,
+                   kp.exam_subject_id, es.subject_name as exam_subject_name
+              from current_goal goal
+              join cm_knowledge_point kp
+                on kp.syllabus_version_id = goal.syllabus_version_id
+               and kp.del_flag = '0'
+               and kp.status = '0'
+              join cm_exam_subject es
+                on es.id = kp.exam_subject_id
+               and es.certification_id = goal.certification_id
+              join cm_syllabus_version sv
+                on sv.id = kp.syllabus_version_id
+               and sv.certification_id = goal.certification_id
+             where kp.id in
+            <foreach collection="ids" item="id" open="(" separator="," close=")">
+                #{id}
+            </foreach>
+        )
+        select (goal.goal_id is not null) as current_goal_found,
+               matched.id, matched.syllabus_number, matched.syllabus_title,
+               matched.exam_subject_id, matched.exam_subject_name
+          from (select 1) input
+          left join current_goal goal on true
+          left join matched on true
+    </select>
+</mapper>

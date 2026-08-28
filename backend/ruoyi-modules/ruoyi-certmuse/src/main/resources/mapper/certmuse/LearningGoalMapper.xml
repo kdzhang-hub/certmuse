@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.dromara.certmuse.learning.mapper.LearningGoalMapper">
+    <select id="selectCurrentGoalId" resultType="long">
+        select id from cm_user_goal
+        where user_id=#{userId} and status in ('active', 'paused')
+        order by update_time desc, id desc limit 1
+    </select>
+    <select id="lockCurrentGoalId" resultType="long">
+        select id from cm_user_goal
+        where user_id=#{userId} and status in ('active', 'paused')
+        order by update_time desc, id desc limit 1 for update
+    </select>
+    <select id="selectSelectableCertifications" resultType="org.dromara.certmuse.learning.domain.LearningGoalCertificationRow">
+        select ec.id certification_id, ec.certification_code, ec.certification_name,
+               sv.id syllabus_version_id, sv.version_name syllabus_version_name
+          from cm_exam_certification ec
+          join lateral (
+              select id, version_name from cm_syllabus_version
+               where certification_id=ec.id
+                 and (published_date &lt;= #{today} or published_date is null)
+               order by (published_date is null) asc, published_date desc nulls last,
+                        create_time desc, id desc limit 1
+          ) sv on true
+         where ec.status='0'
+         order by ec.sort_order, ec.id
+    </select>
+    <select id="selectCertificationStatus" resultType="string">
+        select status from cm_exam_certification where id=#{certificationId}
+    </select>
+    <select id="selectEnabledCertificationWithSyllabus" resultType="org.dromara.certmuse.learning.domain.LearningGoalCertificationRow">
+        select ec.id certification_id, ec.certification_code, ec.certification_name,
+               sv.id syllabus_version_id, sv.version_name syllabus_version_name
+          from cm_exam_certification ec
+          join lateral (
+              select id, version_name from cm_syllabus_version
+               where certification_id=ec.id
+                 and (published_date &lt;= #{today} or published_date is null)
+               order by (published_date is null) asc, published_date desc nulls last,
+                        create_time desc, id desc limit 1
+          ) sv on true
+         where ec.id=#{certificationId} and ec.status='0'
+    </select>
+    <insert id="insertGoal">
+        insert into cm_user_goal(
+            id,user_id,certification_id,syllabus_version_id,target_exam_year,target_exam_month,daily_minutes,status,row_version,exam_batch_type,target_exam_date
+        ) values(
+            #{id},#{userId},#{certificationId},#{syllabusVersionId},#{targetExamYear},#{targetExamMonth},#{dailyMinutes},'active',0,
+            coalesce(#{examBatchType},'estimated'),#{targetExamDate}
+        )
+    </insert>
+    <insert id="insertGoalChange">
+        insert into cm_user_goal_change(
+            id,goal_id,user_id,change_type,before_data,after_data,reason,request_id,operator_id
+        ) values(
+            #{id},#{goalId},#{userId},'created',null,cast(#{afterData} as jsonb),null,#{requestId},#{operatorId}
+        )
+    </insert>
+    <select id="selectGoal" resultType="org.dromara.certmuse.learning.domain.LearningGoalRow">
+        select g.id, g.certification_id, ec.certification_name, g.syllabus_version_id, sv.version_name syllabus_version_name,
+               g.target_exam_year, g.target_exam_month, g.daily_minutes, g.status, g.row_version,g.exam_batch_type,g.target_exam_date
+          from cm_user_goal g
+          join cm_exam_certification ec on ec.id=g.certification_id
+          join cm_syllabus_version sv on sv.id=g.syllabus_version_id
+         where g.id=#{goalId}
+    </select>
+    <select id="selectIdempotency" resultType="org.dromara.certmuse.learning.domain.LearningGoalIdempotencyRow">
+        select i.payload_hash, i.status, i.resource_id, cast(i.response_body as text) response_body, g.user_id goal_owner_id
+          from cm_idempotency_record i
+          left join cm_user_goal g on g.id=i.resource_id
+         where i.action_code=#{action} and i.request_id=#{requestId}
+    </select>
+    <insert id="insertIdempotency">
+        insert into cm_idempotency_record(
+            id,action_code,request_id,payload_hash,status,resource_type,resource_id,expires_time
+        ) values(
+            #{id},#{action},#{requestId},#{payloadHash},'processing','learning_goal',#{resourceId},#{expiresTime}
+        ) on conflict do nothing
+    </insert>
+    <update id="completeIdempotency">
+        update cm_idempotency_record
+           set status='succeeded',response_status=200,response_body=cast(#{responseBody} as jsonb),update_time=now()
+         where id=#{id}
+    </update>
+    <select id="selectBatchSnapshot" resultType="org.dromara.certmuse.learning.domain.LearningGoalBatchRow">
+        (select 'official' exam_batch_type, schedule.exam_start_date target_exam_date from cm_exam_schedule schedule
+          join cm_exam_period period on period.id=schedule.exam_period_id
+          where schedule.certification_id=#{certificationId} and period.status='published' and period.record_origin='official'
+            and schedule.exam_start_date &gt; #{today}
+            and extract(year from schedule.exam_start_date)=#{targetExamYear} and extract(month from schedule.exam_start_date)=#{targetExamMonth}
+          order by schedule.exam_start_date, schedule.id
+          limit 1)
+        union all select 'estimated', null where not exists (
+            select 1 from cm_exam_schedule schedule join cm_exam_period period on period.id=schedule.exam_period_id
+             where schedule.certification_id=#{certificationId} and period.status='published' and period.record_origin='official'
+               and schedule.exam_start_date &gt; #{today} and extract(year from schedule.exam_start_date)=#{targetExamYear}
+               and extract(month from schedule.exam_start_date)=#{targetExamMonth}
+        )
+    </select>
+    <select id="selectFutureOfficialBatches" resultType="org.dromara.certmuse.learning.domain.LearningGoalBatchRow">
+        select 'official' exam_batch_type, schedule.exam_start_date target_exam_date
+          from cm_exam_schedule schedule join cm_exam_period period on period.id=schedule.exam_period_id
+         where schedule.certification_id=#{certificationId} and period.status='published' and period.record_origin='official'
+           and schedule.exam_start_date &gt; #{today}
+         order by schedule.exam_start_date, schedule.id
+    </select>
+    <select id="selectHistoricalOfficialExamDate" resultType="java.time.LocalDate">
+        select schedule.exam_start_date from cm_exam_schedule schedule
+          join cm_exam_period period on period.id=schedule.exam_period_id
+         where schedule.certification_id=#{certificationId} and period.status in ('published', 'superseded')
+           and extract(year from schedule.exam_start_date)=#{targetExamYear}
+           and extract(month from schedule.exam_start_date)=#{targetExamMonth}
+         order by schedule.exam_start_date desc, schedule.id desc limit 1
+    </select>
+    <select id="selectActiveGoal" resultType="org.dromara.certmuse.learning.domain.LearningGoalRow">
+        select g.id,g.certification_id,ec.certification_name,g.syllabus_version_id,sv.version_name syllabus_version_name,
+               g.target_exam_year,g.target_exam_month,g.daily_minutes,g.status,g.row_version,g.exam_batch_type,g.target_exam_date
+          from cm_user_goal g join cm_exam_certification ec on ec.id=g.certification_id
+          join cm_syllabus_version sv on sv.id=g.syllabus_version_id
+         where g.user_id=#{userId} and g.status='active'
+    </select>
+    <select id="lockActiveGoal" resultType="org.dromara.certmuse.learning.domain.LearningGoalRow">
+        select g.id,g.certification_id,ec.certification_name,g.syllabus_version_id,sv.version_name syllabus_version_name,
+               g.target_exam_year,g.target_exam_month,g.daily_minutes,g.status,g.row_version,g.exam_batch_type,g.target_exam_date
+          from cm_user_goal g join cm_exam_certification ec on ec.id=g.certification_id
+          join cm_syllabus_version sv on sv.id=g.syllabus_version_id
+         where g.user_id=#{userId} and g.status='active' for update of g
+    </select>
+    <select id="selectPendingSessions" resultType="org.dromara.certmuse.learning.domain.LearningGoalSwitchSessionRow">
+        select s.id,s.session_type,coalesce(t.display_snapshot-&gt;&gt;'title',
+          case s.session_type when 'initial_diagnosis' then '首次诊断' when 'self_practice' then '知识点练习'
+           when 'task_test' then '任务测验' when 'simulation' then '模拟考试' when 'correction' then '错题订正'
+           when 'independent_verification' then '独立验证' when 'simulation_verification' then '模拟考试验证' else '每日任务' end) title,s.status
+          from cm_learning_session s left join cm_learning_task t on t.id=s.source_task_id
+         where s.goal_id=#{goalId} and s.status in ('created','in_progress') order by s.create_time,s.id
+    </select>
+    <select id="lockPendingSessions" resultType="org.dromara.certmuse.learning.domain.LearningGoalSwitchSessionRow">
+        select s.id,s.session_type,'待放弃会话' title,s.status from cm_learning_session s
+         where s.goal_id=#{goalId} and s.status in ('created','in_progress') order by s.create_time,s.id for update
+    </select>
+    <update id="cancelPendingSessions">
+        update cm_learning_session set status='cancelled',status_reason='goal_switched',status_changed_by=#{operatorId},
+            status_changed_time=now(),update_time=now() where goal_id=#{goalId} and status in ('created','in_progress')
+    </update>
+    <update id="pauseGoal">
+        update cm_user_goal set status='paused',row_version=row_version+1,update_time=now()
+         where id=#{goalId} and status='active' and row_version=#{expectedVersion}
+    </update>
+    <insert id="insertGoalSwitchChange">
+        insert into cm_user_goal_change(id,goal_id,user_id,change_type,before_data,after_data,reason,request_id,operator_id)
+        values(#{id},#{goalId},#{userId},#{changeType},cast(#{beforeData} as jsonb),cast(#{afterData} as jsonb),#{reason},#{requestId},#{operatorId})
+    </insert>
+</mapper>

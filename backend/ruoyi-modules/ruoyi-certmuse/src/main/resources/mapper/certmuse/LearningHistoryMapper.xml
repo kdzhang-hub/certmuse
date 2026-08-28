@@ -1,0 +1,452 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.dromara.certmuse.learning.mapper.LearningHistoryMapper">
+    <sql id="validAttemptPredicate">
+        a.status in ('submitted','graded') and a.submitted_time is not null and aa.grading_status&lt;&gt;'invalid'
+    </sql>
+
+    <sql id="completedTasks">
+        select t.id task_id,t.user_id,t.goal_id,t.exam_subject_id,t.display_snapshot,
+               s.id session_id,s.settled_time completed_at,
+               max(case when ti.item_order=1 then ti.knowledge_point_id end) knowledge_point_id
+          from cm_learning_task t
+          join cm_task_item ti on ti.task_id=t.id
+          join cm_task_attempt ta on ta.task_item_id=ti.id and ta.attempt_no=1 and ta.status='completed'
+         join cm_learning_session s on s.source_task_id=t.id and s.user_id=t.user_id and s.goal_id=t.goal_id
+               and s.session_type='daily_task' and s.status='completed' and s.settled_time is not null
+         where t.user_id=#{userId} and t.goal_id=#{goalId}
+           and (select count(*) from cm_task_item all_items where all_items.task_id=t.id)=2
+         group by t.id,s.id,s.settled_time
+        having count(distinct ti.id) filter(where ti.item_order in (1,2))=2
+           and count(distinct ti.item_order) filter(where ti.item_order in (1,2))=2
+    </sql>
+
+    <sql id="taskProjection">
+        select ct.task_id,ct.display_snapshot::text,ct.completed_at,es.id subject_id,es.subject_name,
+               ct.knowledge_point_id,
+               count(sq.id)::int question_count,
+               count(*) filter(where a.status in ('submitted','graded') and a.submitted_time is not null
+                    and aa.grading_status&lt;&gt;'invalid' and a.is_skipped)::int skipped_count,
+               count(*) filter(where a.status in ('submitted','graded') and a.submitted_time is not null
+                    and aa.grading_status='graded' and not a.is_skipped and aa.score_rate=1)::int correct_count,
+               count(*) filter(where a.status in ('submitted','graded') and a.submitted_time is not null
+                    and aa.grading_status='graded' and not a.is_skipped and aa.score_rate&lt;1)::int incorrect_count,
+               count(*) filter(where a.id is null or a.status not in ('submitted','graded') or a.submitted_time is null
+                    or aa.id is null or aa.grading_status in ('pending','invalid'))::int pending_count
+          from (<include refid="completedTasks"/>) ct
+          join cm_exam_subject es on es.id=ct.exam_subject_id
+          join cm_session_question sq on sq.session_id=ct.session_id
+          left join cm_question_attempt a on a.session_question_id=sq.id and a.user_id=ct.user_id
+          left join cm_attempt_answer aa on aa.attempt_id=a.id
+         group by ct.task_id,ct.display_snapshot,ct.completed_at,es.id,es.subject_name,ct.knowledge_point_id
+    </sql>
+
+    <select id="selectActiveGoal" resultType="long">
+        select min(id) from cm_user_goal where user_id=#{userId} and status='active' having count(*)=1
+    </select>
+    <select id="existsOwnedGoal" resultType="boolean">
+        select exists(select 1 from cm_user_goal where id=#{goalId} and user_id=#{userId})
+    </select>
+    <select id="selectGoals" resultType="org.dromara.certmuse.learning.domain.HistoryGoalRow">
+        with facts as (
+            select s.goal_id,max(a.submitted_time) fact_time
+              from cm_learning_session s join cm_session_question sq on sq.session_id=s.id
+              join cm_question_attempt a on a.session_question_id=sq.id and a.user_id=s.user_id
+              join cm_attempt_answer aa on aa.attempt_id=a.id
+             where s.user_id=#{userId} and <include refid="validAttemptPredicate"/> group by s.goal_id
+            union all
+            select s.goal_id,max(s.settled_time)
+              from cm_learning_session s join cm_learning_task t on t.id=s.source_task_id
+             where s.user_id=#{userId} and s.session_type='daily_task' and s.status='completed' and s.settled_time is not null
+             group by s.goal_id
+            union all
+            select r.goal_id,max(r.generated_time) from cm_assessment_report r
+             where r.user_id=#{userId} and r.generated_time is not null group by r.goal_id
+        ), visible as (select goal_id,max(fact_time) last_record_at from facts group by goal_id)
+        select g.id goal_id,ec.certification_name,sv.version_name syllabus_version_name,g.target_exam_date,g.status,
+               (g.status='active') current,v.last_record_at
+          from visible v join cm_user_goal g on g.id=v.goal_id and g.user_id=#{userId}
+          join cm_exam_certification ec on ec.id=g.certification_id
+          join cm_syllabus_version sv on sv.id=g.syllabus_version_id
+         order by (g.status='active') desc,v.last_record_at desc,g.id desc
+    </select>
+
+    <select id="countTasks" resultType="long">
+        select count(*) from (<include refid="taskProjection"/>) x
+         where 1=1
+        <if test="keyword != null">
+           and ((x.display_snapshot::jsonb)-&gt;&gt;'title' ilike concat('%',#{keyword},'%')
+                or (x.display_snapshot::jsonb)-&gt;&gt;'knowledgePoint' ilike concat('%',#{keyword},'%'))
+        </if>
+        <if test="subjectId != null">
+           and x.subject_id=#{subjectId}
+        </if>
+        <if test="knowledgePointId != null">
+           and x.knowledge_point_id=#{knowledgePointId}
+        </if>
+        <if test="from != null">
+           and x.completed_at&gt;=#{from}
+        </if>
+        <if test="to != null">
+           and x.completed_at&lt;#{to}
+        </if>
+    </select>
+    <select id="selectTasks" resultType="org.dromara.certmuse.learning.domain.HistoryTaskRow">
+        select * from (<include refid="taskProjection"/>) x
+         where 1=1
+        <if test="keyword != null">
+           and ((x.display_snapshot::jsonb)-&gt;&gt;'title' ilike concat('%',#{keyword},'%')
+                or (x.display_snapshot::jsonb)-&gt;&gt;'knowledgePoint' ilike concat('%',#{keyword},'%'))
+        </if>
+        <if test="subjectId != null">
+           and x.subject_id=#{subjectId}
+        </if>
+        <if test="knowledgePointId != null">
+           and x.knowledge_point_id=#{knowledgePointId}
+        </if>
+        <if test="from != null">
+           and x.completed_at&gt;=#{from}
+        </if>
+        <if test="to != null">
+           and x.completed_at&lt;#{to}
+        </if>
+         order by x.completed_at desc,x.task_id desc offset #{offset} limit #{limit}
+    </select>
+    <select id="selectTask" resultType="org.dromara.certmuse.learning.domain.HistoryTaskRow">
+        select * from (<include refid="taskProjection"/>) x where x.task_id=#{taskId}
+    </select>
+    <select id="selectTaskAttempts" resultType="org.dromara.certmuse.learning.domain.HistoryAttemptRow">
+        select sq.question_id,a.id attempt_id,s.id session_id,s.session_type,sq.question_order,a.submitted_time answered_at,
+               sq.difficulty_snapshot,sq.presentation_snapshot::text,sq.grading_snapshot::text,
+               sq.knowledge_snapshot::text,aa.answer_data::text,
+               aa.score,aa.max_score,aa.score_rate,aa.grading_status,a.is_skipped skipped,
+               (select count(*) from cm_error_record e join cm_question_attempt ea on ea.id=e.attempt_id
+                 join cm_session_question esq on esq.id=ea.session_question_id
+                where e.user_id=#{userId} and e.goal_id=#{goalId} and esq.question_id=sq.question_id
+                  and e.status in ('unresolved','correcting')) pending_error_count,
+               (select count(*) from cm_correction_record cr join cm_error_record e on e.id=cr.error_record_id
+                 join cm_question_attempt ea on ea.id=e.attempt_id join cm_session_question esq on esq.id=ea.session_question_id
+                where e.user_id=#{userId} and e.goal_id=#{goalId} and esq.question_id=sq.question_id and cr.status='success') successful_correction_count,
+               (select count(*) from cm_error_record e join cm_question_attempt ea on ea.id=e.attempt_id
+                 join cm_session_question esq on esq.id=ea.session_question_id
+                where e.user_id=#{userId} and e.goal_id=#{goalId} and esq.question_id=sq.question_id) error_count
+          from cm_learning_session s join cm_session_question sq on sq.session_id=s.id
+          join cm_question_attempt a on a.session_question_id=sq.id and a.user_id=s.user_id
+          join cm_attempt_answer aa on aa.attempt_id=a.id
+         where s.user_id=#{userId} and s.goal_id=#{goalId} and s.source_task_id=#{taskId}
+           and s.session_type='daily_task' and s.status='completed' and <include refid="validAttemptPredicate"/>
+         order by sq.question_order
+    </select>
+
+    <sql id="questionAggregate">
+        with valid as (
+            select s.user_id,s.goal_id,s.id session_id,s.session_type,sq.question_id,sq.question_order,
+                   sq.difficulty_snapshot,sq.presentation_snapshot,sq.knowledge_snapshot,
+                   a.id attempt_id,a.submitted_time answered_at,a.is_skipped skipped,
+                   aa.answer_data,aa.score,aa.max_score,aa.score_rate,aa.grading_status
+              from cm_learning_session s join cm_session_question sq on sq.session_id=s.id
+              join cm_question_attempt a on a.session_question_id=sq.id and a.user_id=s.user_id
+              join cm_attempt_answer aa on aa.attempt_id=a.id
+             where s.user_id=#{userId} and s.goal_id=#{goalId} and <include refid="validAttemptPredicate"/>
+        ), latest as (
+            select distinct on (question_id) *,count(*) over(partition by question_id) attempt_count
+              from valid order by question_id,answered_at desc,attempt_id desc
+        ), errors as (
+            select esq.question_id,count(*)::int error_count,
+                   count(*) filter(where e.status in ('unresolved','correcting'))::int pending_error_count,
+                   count(*) filter(where cr.status='success')::int successful_correction_count
+              from cm_error_record e join cm_question_attempt ea on ea.id=e.attempt_id
+              join cm_session_question esq on esq.id=ea.session_question_id
+              left join cm_correction_record cr on cr.error_record_id=e.id and cr.status='success'
+             where e.user_id=#{userId} and e.goal_id=#{goalId} group by esq.question_id
+        )
+        select l.*,coalesce(e.error_count,0) error_count,coalesce(e.pending_error_count,0) pending_error_count,
+               coalesce(e.successful_correction_count,0) successful_correction_count
+          from latest l left join errors e on e.question_id=l.question_id
+    </sql>
+    <sql id="questionBaseFilters">
+         where 1=1
+        <if test="keyword != null">
+           and regexp_replace(x.presentation_snapshot-&gt;&gt;'stem','&lt;[^&gt;]*&gt;','','g') ilike concat('%',#{keyword},'%')
+        </if>
+        <if test="questionType != null">
+           and upper(x.presentation_snapshot-&gt;&gt;'questionType')=#{questionType}
+        </if>
+        <if test="difficulty != null">
+           and upper(x.difficulty_snapshot)=#{difficulty}
+        </if>
+        <if test="knowledgePointId != null">
+           and exists(
+               select 1 from jsonb_array_elements(case when jsonb_typeof(x.knowledge_snapshot-&gt;'items')='array'
+                    then x.knowledge_snapshot-&gt;'items' else '[]'::jsonb end) k
+                where coalesce(k-&gt;&gt;'knowledgePointId',k-&gt;&gt;'id')=#{knowledgePointId}::text)
+        </if>
+        <if test="from != null">
+           and x.answered_at&gt;=#{from}
+        </if>
+        <if test="to != null">
+           and x.answered_at&lt;#{to}
+        </if>
+    </sql>
+    <sql id="questionCorrectionFilter">
+        <if test="correctionStatus != null">
+           and (#{correctionStatus}='PENDING_CORRECTION' and x.pending_error_count&gt;0
+                or #{correctionStatus}='CORRECTED' and x.pending_error_count=0 and x.successful_correction_count&gt;0
+                or #{correctionStatus}='NONE' and x.error_count=0)
+        </if>
+    </sql>
+    <select id="countInconsistentQuestions" resultType="long">
+        select count(*) from (<include refid="questionAggregate"/>) x <include refid="questionBaseFilters"/>
+         and x.error_count&gt;0 and x.pending_error_count=0 and x.successful_correction_count=0
+    </select>
+    <select id="countQuestions" resultType="long">
+        select count(*) from (<include refid="questionAggregate"/>) x <include refid="questionBaseFilters"/>
+        <include refid="questionCorrectionFilter"/>
+    </select>
+    <select id="selectQuestions" resultType="org.dromara.certmuse.learning.domain.HistoryAttemptRow">
+        select x.question_id,x.attempt_id,x.session_id,x.session_type,x.question_order,x.answered_at,
+               x.difficulty_snapshot,x.presentation_snapshot::text,x.knowledge_snapshot::text,x.answer_data::text,
+               x.score,x.max_score,x.score_rate,x.grading_status,x.skipped,x.attempt_count,x.pending_error_count,
+               x.successful_correction_count,x.error_count
+          from (<include refid="questionAggregate"/>) x <include refid="questionBaseFilters"/>
+        <include refid="questionCorrectionFilter"/>
+         order by x.answered_at desc,x.question_id desc offset #{offset} limit #{limit}
+    </select>
+    <select id="selectQuestionAttempts" resultType="org.dromara.certmuse.learning.domain.HistoryAttemptRow">
+        with errors as (
+            select count(*)::int error_count,count(*) filter(where e.status in ('unresolved','correcting'))::int pending_error_count,
+                   count(*) filter(where cr.status='success')::int successful_correction_count
+              from cm_error_record e join cm_question_attempt ea on ea.id=e.attempt_id
+              join cm_session_question esq on esq.id=ea.session_question_id
+              left join cm_correction_record cr on cr.error_record_id=e.id and cr.status='success'
+             where e.user_id=#{userId} and e.goal_id=#{goalId} and esq.question_id=#{questionId}
+        )
+        select sq.question_id,a.id attempt_id,s.id session_id,s.session_type,sq.question_order,a.submitted_time answered_at,
+               sq.difficulty_snapshot,sq.presentation_snapshot::text,sq.knowledge_snapshot::text,aa.answer_data::text,
+               aa.score,aa.max_score,aa.score_rate,aa.grading_status,a.is_skipped skipped,
+               count(*) over() attempt_count,e.pending_error_count,e.successful_correction_count,e.error_count
+          from cm_learning_session s join cm_session_question sq on sq.session_id=s.id
+          join cm_question_attempt a on a.session_question_id=sq.id and a.user_id=s.user_id
+          join cm_attempt_answer aa on aa.attempt_id=a.id cross join errors e
+         where s.user_id=#{userId} and s.goal_id=#{goalId} and sq.question_id=#{questionId}
+           and <include refid="validAttemptPredicate"/>
+         order by a.submitted_time desc,a.id desc
+    </select>
+    <select id="selectCorrectionEvents" resultType="org.dromara.certmuse.learning.domain.HistoryCorrectionEventRow">
+        select min(e.id) fact_id,a.id attempt_id,s.session_type,min(e.detected_time) occurred_at,a.is_skipped skipped,false correction
+          from cm_error_record e join cm_question_attempt a on a.id=e.attempt_id
+          join cm_session_question sq on sq.id=a.session_question_id join cm_learning_session s on s.id=sq.session_id
+         where e.user_id=#{userId} and e.goal_id=#{goalId} and sq.question_id=#{questionId}
+         group by a.id,s.session_type,a.is_skipped
+        union all
+        select min(cr.id) fact_id,ca.id attempt_id,cs.session_type,
+               min(coalesce(cr.settled_time,cr.submitted_time)) occurred_at,false,true
+          from cm_correction_record cr join cm_error_record e on e.id=cr.error_record_id
+          join cm_question_attempt ea on ea.id=e.attempt_id join cm_session_question esq on esq.id=ea.session_question_id
+          join cm_question_attempt ca on ca.id=cr.correction_attempt_id
+          join cm_session_question csq on csq.id=ca.session_question_id join cm_learning_session cs on cs.id=csq.session_id
+         where e.user_id=#{userId} and e.goal_id=#{goalId} and esq.question_id=#{questionId} and cr.status='success'
+         group by ca.id,cs.session_type
+         order by occurred_at desc,fact_id desc
+    </select>
+
+    <sql id="practiceFilters">
+         where s.user_id=#{userId} and s.goal_id=#{goalId}
+           and s.session_type in ('self_practice','past_paper_practice')
+           and s.status='completed' and s.settled_time is not null
+        <if test="sessionId != null">
+           and s.id=#{sessionId}
+        </if>
+        <if test="sessionType != null">
+           and s.session_type=#{sessionType}
+        </if>
+        <if test="from != null">
+           and s.settled_time&gt;=#{from}
+        </if>
+        <if test="to != null">
+           and s.settled_time&lt;#{to}
+        </if>
+    </sql>
+    <sql id="practiceBase">
+        select s.id session_id,s.session_type,
+               case when s.session_type='self_practice' then '知识点练习' else revision.collection_name end title,
+               es.id subject_id,es.subject_name,s.started_time started_at,s.settled_time completed_at,
+               count(sq.id)::int question_count,
+               count(answer.id) filter(where attempt.status in ('submitted','graded')
+                   and attempt.submitted_time is not null)::int answered_count,
+               count(answer.id) filter(where attempt.status in ('submitted','graded')
+                   and attempt.submitted_time is not null and answer.grading_status='graded'
+                   and answer.score_rate=1)::int correct_count,
+               count(answer.id) filter(where attempt.status in ('submitted','graded')
+                   and attempt.submitted_time is not null and answer.grading_status='graded'
+                   and answer.score_rate&lt;1)::int incorrect_count,
+               coalesce(jsonb_agg(sq.knowledge_snapshot order by sq.question_order,sq.id)
+                   filter(where sq.id is not null),'[]'::jsonb)::text knowledge_snapshots
+          from cm_learning_session s
+          join cm_exam_subject es on es.id=s.exam_subject_id
+          left join cm_collection_revision revision on revision.id=s.collection_revision_id
+          left join cm_session_question sq on sq.session_id=s.id
+          left join cm_question_attempt attempt on attempt.session_question_id=sq.id
+               and attempt.user_id=s.user_id and attempt.attempt_no=1
+          left join cm_attempt_answer answer on answer.attempt_id=attempt.id
+               and answer.grading_status&lt;&gt;'invalid'
+        <include refid="practiceFilters"/>
+         group by s.id,s.session_type,revision.collection_name,es.id,es.subject_name,s.started_time,s.settled_time
+    </sql>
+    <select id="countPractices" resultType="long">
+        select count(*) from cm_learning_session s <include refid="practiceFilters"/>
+    </select>
+    <select id="selectPractices" resultType="org.dromara.certmuse.learning.domain.HistoryPracticeSessionRow">
+        select * from (<include refid="practiceBase"/>) practice
+         order by completed_at desc,session_id desc offset #{offset} limit #{limit}
+    </select>
+    <select id="selectPractice" resultType="org.dromara.certmuse.learning.domain.HistoryPracticeSessionRow">
+        select * from (<include refid="practiceBase"/>) practice
+    </select>
+    <select id="selectPracticeItems" resultType="org.dromara.certmuse.learning.domain.HistoryPracticeItemRow">
+        select sq.question_id,sq.question_order,sq.difficulty_snapshot,sq.presentation_snapshot::text,
+               sq.grading_snapshot::text,sq.knowledge_snapshot::text,sq.ai_rubric_snapshot::text,
+               attempt.id attempt_id,attempt.is_skipped skipped,attempt.submitted_time,
+               answer.answer_data::text,answer.grading_status,answer.grading_result::text,
+               answer.grading_source,answer.grading_revision_no,answer.score,answer.max_score,answer.score_rate
+          from cm_learning_session s
+          join cm_session_question sq on sq.session_id=s.id
+          left join cm_question_attempt attempt on attempt.session_question_id=sq.id
+               and attempt.user_id=s.user_id and attempt.attempt_no=1
+               and attempt.status in ('submitted','graded') and attempt.submitted_time is not null
+          left join cm_attempt_answer answer on answer.attempt_id=attempt.id
+               and answer.grading_status&lt;&gt;'invalid'
+         where s.id=#{sessionId} and s.user_id=#{userId} and s.goal_id=#{goalId}
+           and s.session_type in ('self_practice','past_paper_practice')
+           and s.status='completed' and s.settled_time is not null
+         order by sq.question_order,sq.id
+    </select>
+
+    <sql id="eligibleExamPredicate">
+        ((s.session_type='initial_diagnosis' and s.status in ('settling','completed') and s.submitted_time is not null)
+          or (s.session_type in ('past_paper_exam','simulation') and s.status='completed' and s.settled_time is not null))
+    </sql>
+    <sql id="examFacts">
+        select s.id session_id,s.status session_status,
+               case s.session_type when 'initial_diagnosis' then 'INITIAL_DIAGNOSIS'
+                    when 'past_paper_exam' then 'PAST_PAPER' else 'SIMULATION' end exam_type,
+               case when s.session_type='initial_diagnosis' then '首次诊断' else revision.collection_name end title,
+               case when s.session_type&lt;&gt;'initial_diagnosis' and subjects.question_count=subjects.subject_value_count
+                          and subjects.subject_count=1 then subjects.subject_id end subject_id,
+               case when s.session_type&lt;&gt;'initial_diagnosis' and subjects.question_count=subjects.subject_value_count
+                          and subjects.subject_count=1 then subjects.subject_name end subject_name,
+               case when s.session_type='initial_diagnosis' then s.submitted_time else s.settled_time end completed_at,
+               case when report.id is null and s.session_type='initial_diagnosis' and s.status='settling' then 'PROCESSING'
+                    when report.id is null then 'UNAVAILABLE'
+                    when report.status='available' then 'AVAILABLE'
+                    when report.status='failed' then 'FAILED' else 'PROCESSING' end report_status,
+               case when report.status='available' then report.total_score end score,
+               case when report.status='available' then report.max_score end max_score,
+               case when report.status='available' and report.max_score&gt;0 then report.total_score/report.max_score end score_rate,
+               case when s.timing_mode='standard' and s.started_time is not null and s.submitted_time is not null
+                          and s.duration_seconds_snapshot&gt;0
+                          and s.deadline_time=s.started_time+(s.duration_seconds_snapshot * interval '1 second')
+                          and s.submitted_time&gt;=s.started_time
+                    then extract(epoch from least(s.submitted_time,s.deadline_time)-s.started_time)::bigint
+                    when s.timing_mode='pausable' and timers.attempt_count=subjects.question_count
+                          and timers.attempt_count=timers.valid_timer_count
+                          and timers.elapsed_seconds&gt;0 and timers.elapsed_seconds&lt;=s.duration_seconds_snapshot
+                    then timers.elapsed_seconds end duration_seconds,
+               case when ((s.timing_mode='standard' and s.started_time is not null and s.submitted_time is not null
+                               and s.duration_seconds_snapshot&gt;0
+                               and s.deadline_time=s.started_time+(s.duration_seconds_snapshot * interval '1 second')
+                               and s.submitted_time&gt;=s.started_time)
+                           or (s.timing_mode='pausable' and timers.attempt_count=subjects.question_count
+                               and timers.attempt_count=timers.valid_timer_count
+                               and timers.elapsed_seconds&gt;0 and timers.elapsed_seconds&lt;=s.duration_seconds_snapshot))
+                    then s.duration_seconds_snapshot::bigint end duration_limit_seconds,
+               case when ((s.timing_mode='standard' and s.started_time is not null and s.submitted_time is not null
+                               and s.duration_seconds_snapshot&gt;0
+                               and s.deadline_time=s.started_time+(s.duration_seconds_snapshot * interval '1 second')
+                               and s.submitted_time&gt;=s.started_time)
+                           or (s.timing_mode='pausable' and timers.attempt_count=subjects.question_count
+                               and timers.attempt_count=timers.valid_timer_count
+                               and timers.elapsed_seconds&gt;0 and timers.elapsed_seconds&lt;=s.duration_seconds_snapshot))
+                    then 'AVAILABLE' else 'UNAVAILABLE' end duration_status
+          from cm_learning_session s
+          left join cm_collection_revision revision on revision.id=s.collection_revision_id
+          left join cm_assessment_report report on report.session_id=s.id and report.user_id=s.user_id
+               and report.goal_id=s.goal_id and report.report_type=s.session_type
+          left join lateral (
+              select count(*)::int question_count,count(sq.exam_subject_id)::int subject_value_count,
+                     count(distinct sq.exam_subject_id)::int subject_count,min(sq.exam_subject_id) subject_id,
+                     min(subject.subject_name) subject_name
+                from cm_session_question sq
+                left join cm_exam_subject subject on subject.id=sq.exam_subject_id
+               where sq.session_id=s.id
+          ) subjects on true
+          left join lateral (
+              select count(*)::int attempt_count,
+                     count(*) filter(where attempt.timer_status='valid' and attempt.elapsed_seconds is not null)::int valid_timer_count,
+                     coalesce(sum(attempt.elapsed_seconds),0)::bigint elapsed_seconds
+                from cm_session_question sq
+                join cm_question_attempt attempt on attempt.session_question_id=sq.id and attempt.user_id=s.user_id
+                     and attempt.attempt_no=1
+               where sq.session_id=s.id
+          ) timers on true
+         where s.user_id=#{userId} and s.goal_id=#{goalId} and <include refid="eligibleExamPredicate"/>
+    </sql>
+    <sql id="examListFilters">
+         where 1=1
+        <if test="examType != null">
+           and x.exam_type=#{examType}
+        </if>
+        <if test="from != null">
+           and x.completed_at&gt;=#{from}
+        </if>
+        <if test="to != null">
+           and x.completed_at&lt;#{to}
+        </if>
+    </sql>
+    <select id="countInconsistentExams" resultType="long">
+        select
+          (select count(*) from cm_learning_session invalid_session
+            where invalid_session.user_id=#{userId} and invalid_session.goal_id=#{goalId}
+              and ((invalid_session.session_type='initial_diagnosis'
+                    and invalid_session.status in ('settling','completed') and invalid_session.submitted_time is null)
+                or (invalid_session.session_type in ('past_paper_exam','simulation')
+                    and invalid_session.status='completed' and invalid_session.settled_time is null)))
+          +
+          (select count(*) from (<include refid="examFacts"/>) x
+            where x.completed_at is null or x.title is null or btrim(x.title)=''
+               or (x.session_status='completed' and x.report_status='UNAVAILABLE')
+               or (x.report_status='AVAILABLE' and (x.score is null or x.max_score is null or x.max_score&lt;=0
+                    or x.score&lt;0 or x.score&gt;x.max_score or x.score_rate is null or x.score_rate&lt;0 or x.score_rate&gt;1))
+               or (x.report_status&lt;&gt;'AVAILABLE' and (x.score is not null or x.max_score is not null or x.score_rate is not null))
+               or ((x.subject_id is null) &lt;&gt; (x.subject_name is null)))
+    </select>
+    <select id="countExams" resultType="long">
+        select count(*) from (<include refid="examFacts"/>) x <include refid="examListFilters"/>
+    </select>
+    <select id="selectExams" resultType="org.dromara.certmuse.learning.domain.HistoryExamRow">
+        select x.* from (<include refid="examFacts"/>) x <include refid="examListFilters"/>
+         order by x.completed_at desc,x.session_id desc offset #{offset} limit #{limit}
+    </select>
+    <select id="selectExam" resultType="org.dromara.certmuse.learning.domain.HistoryExamRow">
+        select x.* from (<include refid="examFacts"/>) x where x.session_id=#{sessionId}
+    </select>
+    <select id="selectExamQuestions" resultType="org.dromara.certmuse.learning.domain.HistoryExamQuestionRow">
+        select sq.question_id,sq.question_order,sq.difficulty_snapshot,sq.presentation_snapshot::text,
+               sq.grading_snapshot::text,sq.knowledge_snapshot::text,sq.ai_rubric_snapshot::text,
+               attempt.is_skipped skipped,attempt.submitted_time,answer.answer_data::text,
+               answer.grading_status,answer.grading_result::text,answer.grading_source,
+               answer.grading_revision_no,answer.score,answer.max_score,answer.score_rate
+          from cm_learning_session s
+          join cm_session_question sq on sq.session_id=s.id
+          left join lateral (
+              select a.* from cm_question_attempt a
+               where a.session_question_id=sq.id and a.user_id=s.user_id
+                 and a.status in ('submitted','graded') and a.submitted_time is not null
+               order by a.submitted_time desc,a.id desc limit 1
+          ) attempt on true
+          left join cm_attempt_answer answer on answer.attempt_id=attempt.id and answer.grading_status&lt;&gt;'invalid'
+         where s.id=#{sessionId} and s.user_id=#{userId} and s.goal_id=#{goalId}
+           and <include refid="eligibleExamPredicate"/>
+         order by sq.question_order,sq.id
+    </select>
+</mapper>

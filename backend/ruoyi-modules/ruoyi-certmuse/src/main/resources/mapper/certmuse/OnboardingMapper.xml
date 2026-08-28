@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.dromara.certmuse.learning.mapper.OnboardingMapper">
+    <select id="selectStatus" resultType="org.dromara.certmuse.learning.domain.OnboardingRow">
+        select g.id goal_id, g.certification_id, g.status goal_status,
+               s.id session_id, s.status session_status, r.status report_status, coalesce(p.profile_count, 0) profile_count,
+               coalesce(t.task_count, 0) task_count
+          from lateral (
+              select id, certification_id, status
+                from cm_user_goal
+               where user_id = #{userId} and status in ('active', 'paused')
+               order by case status when 'active' then 0 else 1 end, update_time desc, id desc
+               limit 1
+          ) g
+          left join lateral (
+              select id, status
+                from cm_learning_session
+               where user_id = #{userId} and goal_id = g.id and session_type = 'initial_diagnosis'
+               order by create_time desc, id desc
+               limit 1
+          ) s on true
+          left join lateral (
+              select status
+                from cm_assessment_report
+               where user_id = #{userId} and goal_id = g.id and session_id = s.id
+               order by create_time desc, id desc
+               limit 1
+          ) r on true
+          left join lateral (
+              select count(*) profile_count from cm_overall_profile op where op.user_id=#{userId} and op.goal_id=g.id
+          ) p on true
+          left join lateral (
+              select count(*) task_count
+                from cm_learning_task
+               where user_id = #{userId} and goal_id = g.id
+                 and (select count(*) from cm_task_item required_item
+                       where required_item.task_id = cm_learning_task.id
+                         and required_item.item_order in (1, 2)
+                         and exists (select 1 from cm_task_attempt a
+                                      where a.task_item_id = required_item.id
+                                        and a.attempt_no = 1
+                                        and a.status = 'completed')) &lt; 2
+          ) t on true
+    </select>
+</mapper>

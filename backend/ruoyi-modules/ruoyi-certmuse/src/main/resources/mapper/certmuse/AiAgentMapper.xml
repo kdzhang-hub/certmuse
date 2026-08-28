@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.dromara.certmuse.ai.mapper.AiAgentMapper">
+    <insert id="insertRun">
+        insert into cm_ai_run(id,task_type,resource_type,resource_id,status,agent_version,policy_version,
+                              prompt_version,model_name)
+        values(#{id},#{taskType},#{resourceType},#{resourceId},'RUNNING','learning-agent/1.0',
+               'bounded-read-only/1.0',#{promptVersion},#{modelName})
+    </insert>
+    <insert id="insertStep">
+        insert into cm_ai_run_step(id,run_id,step_order,step_type,status,result_count,duration_ms,error_code)
+        values(#{id},#{runId},#{stepOrder},#{stepType},#{status},#{resultCount},#{durationMs},#{errorCode})
+    </insert>
+    <insert id="insertEvidence">
+        insert into cm_ai_run_evidence(id,run_id,chunk_id,evidence_rank,lexical_score,semantic_score,fused_score,
+                                       content_hash,citation_snapshot,evidence_excerpt)
+        values(#{id},#{runId},#{chunkId},#{rank},#{lexicalScore},#{semanticScore},#{fusedScore},#{contentHash},
+               cast(#{citationSnapshot} as jsonb),#{excerpt})
+    </insert>
+    <update id="succeedRun">
+        update cm_ai_run set status='SUCCEEDED',duration_ms=#{durationMs},completed_time=now(),error_code=null
+        where id=#{id} and status='RUNNING'
+    </update>
+    <update id="failRun">
+        update cm_ai_run set status='FAILED',duration_ms=#{durationMs},completed_time=now(),error_code=#{errorCode}
+        where id=#{id} and status='RUNNING'
+    </update>
+</mapper>

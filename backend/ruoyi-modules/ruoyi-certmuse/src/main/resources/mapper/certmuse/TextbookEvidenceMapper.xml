@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.dromara.certmuse.catalog.mapper.TextbookEvidenceMapper">
+    <sql id="candidateColumns">
+        c.id chunk_id,d.id textbook_id,d.title textbook_title,d.edition,
+        c.heading_path::text heading_path,c.source_locator::text source_locator,
+        c.content,c.content_hash
+    </sql>
+    <sql id="publishedScope">
+        d.document_type='textbook' and d.status='published' and d.del_flag='0'
+        and d.syllabus_version_id=#{syllabusVersionId}
+        <choose>
+            <when test="strictKnowledge">
+                and exists (select 1 from cm_chunk_knowledge ck
+                    where ck.chunk_id=c.id and ck.knowledge_point_id in
+                    <foreach collection="knowledgePointIds" item="id" open="(" separator="," close=")">#{id}</foreach>)
+            </when>
+            <otherwise>
+                and exists (select 1 from cm_chunk_knowledge ck
+                    join cm_knowledge_point kp on kp.id=ck.knowledge_point_id and kp.del_flag='0'
+                    where ck.chunk_id=c.id and kp.exam_subject_id=#{examSubjectId})
+            </otherwise>
+        </choose>
+    </sql>
+
+    <select id="selectKnowledgeScope" resultType="org.dromara.certmuse.catalog.domain.TextbookKnowledgeScopeRow">
+        select syllabus_version_id,exam_subject_id from cm_knowledge_point
+        where del_flag='0' and id in
+        <foreach collection="knowledgePointIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+        order by id limit 1
+    </select>
+
+    <select id="selectLexicalCandidates" resultType="org.dromara.certmuse.catalog.domain.TextbookEvidenceCandidateRow">
+        select <include refid="candidateColumns"/>,
+               (1-(lower(coalesce(c.heading,'') || ' ' || c.content) &lt;-&gt; lower(#{queryText})))::numeric score
+        from cm_document_chunk c join cm_document d on d.id=c.document_id
+        where <include refid="publishedScope"/>
+        order by lower(coalesce(c.heading,'') || ' ' || c.content) &lt;-&gt; lower(#{queryText}),c.id limit #{limit}
+    </select>
+
+    <select id="selectSemanticCandidates" resultType="org.dromara.certmuse.catalog.domain.TextbookEvidenceCandidateRow">
+        select <include refid="candidateColumns"/>,
+               (1-(e.embedding &lt;=&gt; cast(#{embedding} as vector)))::numeric score
+        from cm_document_chunk c join cm_document d on d.id=c.document_id
+        join cm_document_chunk_embedding e on e.chunk_id=c.id and e.status='READY'
+            and e.content_hash=c.content_hash and e.model_name=#{embeddingModel}
+        where <include refid="publishedScope"/>
+        order by e.embedding &lt;=&gt; cast(#{embedding} as vector),c.id limit #{limit}
+    </select>
+
+    <select id="claimEmbeddingTask" resultType="org.dromara.certmuse.catalog.domain.TextbookEmbeddingTaskRow" affectData="true">
+        with candidate as (
+            select e.chunk_id from cm_document_chunk_embedding e
+            join cm_document_chunk c on c.id=e.chunk_id
+            join cm_document d on d.id=c.document_id
+            where d.document_type='textbook' and d.status='published' and d.del_flag='0'
+              and (e.status='PENDING'
+                or (e.status='PROCESSING' and e.lease_until &lt; now())
+                or e.content_hash&lt;&gt;c.content_hash or e.model_name&lt;&gt;#{embeddingModel}
+                or e.dimensions&lt;&gt;#{dimensions})
+            order by e.update_time,e.chunk_id for update of e skip locked limit 1
+        ), claimed as (
+            update cm_document_chunk_embedding e
+               set content_hash=c.content_hash,model_name=#{embeddingModel},dimensions=#{dimensions},
+                   embedding=null,status='PROCESSING',attempt_count=case
+                       when e.content_hash&lt;&gt;c.content_hash or e.model_name&lt;&gt;#{embeddingModel} then 1
+                       else e.attempt_count+1 end,
+                   lease_until=now()+interval '2 minutes',error_code=null,update_time=now()
+              from candidate target join cm_document_chunk c on c.id=target.chunk_id
+             where e.chunk_id=target.chunk_id
+         returning e.chunk_id,e.content_hash
+        )
+        select claimed.chunk_id,claimed.content_hash,c.heading,c.content
+          from claimed join cm_document_chunk c on c.id=claimed.chunk_id
+    </select>
+
+    <update id="completeEmbeddingTask">
+        update cm_document_chunk_embedding set embedding=cast(#{embedding} as vector),status='READY',
+               lease_until=null,error_code=null,update_time=now()
+         where chunk_id=#{chunkId} and status='PROCESSING' and content_hash=#{contentHash}
+           and model_name=#{embeddingModel} and dimensions=#{dimensions}
+    </update>
+    <update id="retryEmbeddingTask">
+        update cm_document_chunk_embedding
+           set status=case when attempt_count>=#{maxAttempts} then 'FAILED' else 'PENDING' end,
+               lease_until=null,error_code=#{errorCode},update_time=now()
+         where chunk_id=#{chunkId} and status='PROCESSING'
+    </update>
+    <insert id="queueDocumentEmbeddings">
+        insert into cm_document_chunk_embedding(chunk_id,content_hash,model_name,dimensions,status)
+        select c.id,c.content_hash,#{embeddingModel},#{dimensions},'PENDING'
+          from cm_document_chunk c where c.document_id=#{documentId}
+        on conflict (chunk_id) do update set content_hash=excluded.content_hash,
+            model_name=excluded.model_name,dimensions=excluded.dimensions,embedding=null,status='PENDING',
+            attempt_count=0,lease_until=null,error_code=null,update_time=now()
+    </insert>
+    <insert id="queueChunkEmbedding">
+        insert into cm_document_chunk_embedding(chunk_id,content_hash,model_name,dimensions,status)
+        select c.id,c.content_hash,#{embeddingModel},#{dimensions},'PENDING'
+          from cm_document_chunk c where c.id=#{chunkId}
+        on conflict (chunk_id) do update set content_hash=excluded.content_hash,
+            model_name=excluded.model_name,dimensions=excluded.dimensions,embedding=null,status='PENDING',
+            attempt_count=0,lease_until=null,error_code=null,update_time=now()
+    </insert>
+</mapper>

@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="860" viewBox="0 0 1400 860" role="img" aria-labelledby="title desc">
+  <title id="title">CertMuse source architecture</title>
+  <desc id="desc">A clean architecture diagram showing the learner app, admin app, CertMuse domain module, and shared platform modules.</desc>
+  <defs>
+    <filter id="shadow" x="-12%" y="-18%" width="124%" height="140%">
+      <feDropShadow dx="0" dy="18" stdDeviation="16" flood-color="#1f3855" flood-opacity="0.12"/>
+    </filter>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M2 2 L10 6 L2 10 Z" fill="#6f89a6"/>
+    </marker>
+  </defs>
+
+  <rect width="1400" height="860" fill="#f7fafc"/>
+  <circle cx="1260" cy="120" r="170" fill="#d9eafb" opacity="0.7"/>
+  <circle cx="120" cy="780" r="190" fill="#e1eddc" opacity="0.72"/>
+
+  <text x="80" y="86" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="44" font-weight="850" fill="#162940">Repository map</text>
+  <text x="80" y="125" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="20" font-weight="600" fill="#60758c">Two Vue applications over a focused CertMuse domain module and shared Java platform capabilities.</text>
+
+  <g transform="translate(80 185)" filter="url(#shadow)">
+    <rect x="0" y="0" width="520" height="190" rx="24" fill="#ffffff" stroke="#d9e6f1"/>
+    <text x="30" y="48" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="30" font-weight="850" fill="#162940">web/student</text>
+    <text x="30" y="82" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="18" font-weight="720" fill="#60758c">Learner experience</text>
+    <text x="30" y="122" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="17" fill="#718398">Onboarding, goals, diagnostics, practice</text>
+    <text x="30" y="150" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="17" fill="#718398">Tasks, mistakes, progress, history, resources</text>
+  </g>
+
+  <g transform="translate(800 185)" filter="url(#shadow)">
+    <rect x="0" y="0" width="520" height="190" rx="24" fill="#ffffff" stroke="#d9e6f1"/>
+    <text x="30" y="48" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="30" font-weight="850" fill="#162940">web/admin</text>
+    <text x="30" y="82" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="18" font-weight="720" fill="#60758c">Operations console</text>
+    <text x="30" y="122" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="17" fill="#718398">Catalog, question bank, learning operations</text>
+    <text x="30" y="150" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="17" fill="#718398">Insight workflows and public guide pages</text>
+  </g>
+
+  <path d="M340 375 C405 430 475 462 555 492" fill="none" stroke="#6f89a6" stroke-width="4" marker-end="url(#arrow)"/>
+  <path d="M1060 375 C995 430 925 462 845 492" fill="none" stroke="#6f89a6" stroke-width="4" marker-end="url(#arrow)"/>
+
+  <g transform="translate(280 500)" filter="url(#shadow)">
+    <rect x="0" y="0" width="840" height="190" rx="28" fill="#162940"/>
+    <text x="40" y="52" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="30" font-weight="850" fill="#ffffff">CertMuse domain module</text>
+    <text x="40" y="87" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="18" font-weight="720" fill="#a8bad0">backend/ruoyi-modules/ruoyi-certmuse</text>
+    <g transform="translate(40 120)">
+      <rect x="0" y="0" width="118" height="38" rx="12" fill="#24496e"/>
+      <text x="59" y="25" text-anchor="middle" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="15" font-weight="760" fill="#d8e5f3">assessment</text>
+      <rect x="132" y="0" width="92" height="38" rx="12" fill="#24496e"/>
+      <text x="178" y="25" text-anchor="middle" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="15" font-weight="760" fill="#d8e5f3">catalog</text>
+      <rect x="238" y="0" width="98" height="38" rx="12" fill="#24496e"/>
+      <text x="287" y="25" text-anchor="middle" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="15" font-weight="760" fill="#d8e5f3">learning</text>
+      <rect x="350" y="0" width="86" height="38" rx="12" fill="#24496e"/>
+      <text x="393" y="25" text-anchor="middle" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="15" font-weight="760" fill="#d8e5f3">profile</text>
+      <rect x="450" y="0" width="96" height="38" rx="12" fill="#24496e"/>
+      <text x="498" y="25" text-anchor="middle" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="15" font-weight="760" fill="#d8e5f3">question</text>
+      <rect x="560" y="0" width="76" height="38" rx="12" fill="#24496e"/>
+      <text x="598" y="25" text-anchor="middle" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="15" font-weight="760" fill="#d8e5f3">agent</text>
+      <rect x="650" y="0" width="54" height="38" rx="12" fill="#24496e"/>
+      <text x="677" y="25" text-anchor="middle" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="15" font-weight="760" fill="#d8e5f3">ai</text>
+      <rect x="718" y="0" width="82" height="38" rx="12" fill="#24496e"/>
+      <text x="759" y="25" text-anchor="middle" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="15" font-weight="760" fill="#d8e5f3">shared</text>
+    </g>
+  </g>
+
+  <path d="M700 690 L700 736" fill="none" stroke="#6f89a6" stroke-width="4" marker-end="url(#arrow)"/>
+
+  <g transform="translate(180 750)" filter="url(#shadow)">
+    <rect x="0" y="0" width="1040" height="78" rx="24" fill="#ffffff" stroke="#d9e6f1"/>
+    <text x="34" y="33" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="24" font-weight="850" fill="#162940">Shared platform modules</text>
+    <text x="34" y="59" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="16" fill="#60758c">backend/ruoyi-common, backend/ruoyi-api, backend/ruoyi-admin, and retained RuoYi platform modules</text>
+  </g>
+
+  <g transform="translate(80 430)">
+    <rect x="0" y="0" width="250" height="52" rx="14" fill="#eef6fc" stroke="#d5e3f0"/>
+    <text x="125" y="33" text-anchor="middle" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="17" font-weight="760" fill="#315578">Review source boundaries first</text>
+  </g>
+  <g transform="translate(1070 430)">
+    <rect x="0" y="0" width="250" height="52" rx="14" fill="#f4f7ed" stroke="#d9e6d2"/>
+    <text x="125" y="33" text-anchor="middle" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="17" font-weight="760" fill="#315d40">Bring your own runtime</text>
+  </g>
+</svg>

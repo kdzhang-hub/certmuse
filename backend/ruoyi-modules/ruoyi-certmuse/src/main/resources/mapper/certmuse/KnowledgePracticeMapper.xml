@@ -1,0 +1,559 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.dromara.certmuse.assessment.mapper.KnowledgePracticeMapper">
+    <sql id="eligibleKnowledge">
+        select kp.id, kp.parent_id, kp.exam_subject_id, kp.syllabus_version_id, kp.importance
+          from cm_knowledge_point kp
+         where kp.syllabus_version_id = #{syllabusVersionId}
+           and kp.del_flag = '0' and kp.status = '0'
+    </sql>
+
+    <sql id="snapshotEligibility">
+        r.question_type = 'CHOICE'
+        and r.answer is not null and jsonb_typeof(r.answer) = 'object'
+        and jsonb_exists(r.answer, 'schema_version') and jsonb_exists(r.answer, 'answer_type')
+        and jsonb_exists(r.answer, 'selection_mode') and jsonb_exists(r.answer, 'value')
+        and r.answer-&gt;&gt;'answer_type' = 'option_keys'
+        and r.answer-&gt;&gt;'selection_mode' = 'single'
+        and jsonb_typeof(r.answer-&gt;'value') = 'array'
+        and jsonb_array_length(r.answer-&gt;'value') = 1
+        and exists (select 1 from cm_question_option o where o.question_revision_id = r.id)
+        and not exists (
+            select 1 from jsonb_array_elements_text(r.answer-&gt;'value') a(label)
+             where not exists (select 1 from cm_question_option o
+                                where o.question_revision_id = r.id and o.option_label = a.label))
+        and exists (
+            select 1
+              from cm_question_knowledge leaf_qk
+              join cm_knowledge_point leaf on leaf.id = leaf_qk.knowledge_point_id
+             where leaf_qk.question_revision_id = r.id
+               and leaf_qk.exam_subject_id = leaf.exam_subject_id
+               and leaf.syllabus_version_id = #{syllabusVersionId}
+               and leaf.del_flag = '0' and leaf.status = '0'
+               and not exists (select 1 from cm_knowledge_point child
+                                where child.parent_id = leaf.id and child.del_flag = '0' and child.status = '0'))
+    </sql>
+
+    <sql id="qualifiedQuestions">
+        with recursive scope as (
+            select id, parent_id, exam_subject_id, syllabus_version_id
+              from cm_knowledge_point
+             where id = #{knowledgePointId} and syllabus_version_id = #{syllabusVersionId}
+               and del_flag = '0' and status = '0'
+            union all
+            select child.id, child.parent_id, child.exam_subject_id, child.syllabus_version_id
+              from cm_knowledge_point child join scope parent on child.parent_id = parent.id
+             where child.del_flag = '0' and child.status = '0'
+        ), latest as (
+            select distinct on (r.question_id) r.*
+              from cm_question_revision r
+             where r.status = 'published'
+             order by r.question_id, r.revision_no desc, r.id desc
+        ), qualified as (
+            select distinct q.id question_id, r.id revision_id, root.exam_subject_id
+              from scope root
+              join cm_question_knowledge qk on qk.knowledge_point_id = root.id
+                                                 and qk.exam_subject_id = root.exam_subject_id
+              join cm_question q on q.id = qk.question_id and q.del_flag = '0'
+              join latest r on r.question_id = q.id and r.id = qk.question_revision_id
+             where <include refid="snapshotEligibility"/>
+        )
+    </sql>
+
+    <select id="selectCurrentGoal" resultType="org.dromara.certmuse.assessment.domain.KnowledgePracticeGoalRow">
+        select g.id, g.certification_id, c.certification_name, g.syllabus_version_id,
+               sv.version_name syllabus_version_name, g.row_version, g.status goal_status,
+               c.status certification_status, g.target_exam_year, g.target_exam_month,
+               exists (
+                   select 1 from cm_learning_session s
+                   join cm_assessment_report ar on ar.session_id = s.id and ar.user_id = g.user_id
+                   join cm_overall_profile op on op.user_id = g.user_id and op.goal_id = g.id
+                  where s.user_id = g.user_id and s.goal_id = g.id
+                    and s.session_type = 'initial_diagnosis' and s.status = 'completed'
+                    and ar.status = 'available'
+               ) onboarding_complete
+          from cm_user_goal g
+          join cm_exam_certification c on c.id = g.certification_id
+          join cm_syllabus_version sv on sv.id = g.syllabus_version_id
+         where g.user_id = #{userId} and g.status in ('active','paused')
+         order by case g.status when 'active' then 0 else 1 end, g.update_time desc, g.id desc
+         limit 1
+    </select>
+
+    <select id="countDirectoryViolations" resultType="int">
+        with nodes as (<include refid="eligibleKnowledge"/>), bounds as (
+            select max(tree_depth) max_depth
+              from cm_knowledge_point
+             where syllabus_version_id = #{syllabusVersionId} and del_flag = '0' and status = '0'
+        )
+        select case when coalesce(max_depth,0) &lt; 3 then 1 else 0 end
+             + (select count(*) from nodes n
+                 join cm_knowledge_point kp on kp.id = n.id
+                where kp.tree_depth &lt;= max_depth - 2
+                  and (n.importance is null or n.importance not in (1,2,3)))
+          from bounds
+    </select>
+
+    <select id="selectVisibleNodes" resultType="org.dromara.certmuse.assessment.domain.KnowledgePracticeNodeRow">
+        with recursive nodes as (<include refid="eligibleKnowledge"/>), bounds as (
+            select max(tree_depth) max_depth
+              from cm_knowledge_point
+             where syllabus_version_id=#{syllabusVersionId} and del_flag='0' and status='0'
+        ), visible as (
+            select kp.* from cm_knowledge_point kp join nodes n on n.id = kp.id
+             cross join bounds where kp.tree_depth &lt;= bounds.max_depth - 2
+        ), latest as (
+            select distinct on (r.question_id) r.* from cm_question_revision r
+             where r.status='published' order by r.question_id,r.revision_no desc,r.id desc
+        ), descendants as (
+            select v.id ancestor_id, v.id descendant_id, v.exam_subject_id from visible v
+            union all
+            select d.ancestor_id, child.id, d.exam_subject_id
+              from descendants d join cm_knowledge_point child on child.parent_id=d.descendant_id
+             where child.syllabus_version_id=#{syllabusVersionId} and child.del_flag='0' and child.status='0'
+        ), question_counts as (
+            select v.id knowledge_point_id, count(distinct q.id) question_count
+              from visible v
+              join descendants closure on closure.ancestor_id=v.id
+              join cm_knowledge_point descendant on descendant.id=closure.descendant_id
+              join cm_question_knowledge qk on qk.knowledge_point_id=descendant.id
+                 and qk.exam_subject_id=descendant.exam_subject_id
+              join cm_question q on q.id=qk.question_id and q.del_flag='0'
+              join latest r on r.id=qk.question_revision_id and r.question_id=q.id
+             where <include refid="snapshotEligibility"/>
+             group by v.id
+        )
+        select v.id, v.parent_id, v.exam_subject_id, es.subject_name,
+               case es.subject_code when 'COMPREHENSIVE' then 1 when 'CASE_ANALYSIS' then 2 when 'ESSAY' then 3 else 99 end subject_order,
+               v.syllabus_number, v.syllabus_title, v.tree_depth, v.sort_order, v.importance,
+               coalesce(qc.question_count,0) question_count,
+               kp.current_direct_ability, coalesce(kp.profile_status,'unassessed') profile_status,
+               coalesce(kp.confidence_level,'unassessed') confidence_level
+          from visible v join cm_exam_subject es on es.id=v.exam_subject_id
+          left join question_counts qc on qc.knowledge_point_id=v.id
+          left join cm_knowledge_profile kp on kp.user_id=#{userId} and kp.goal_id=#{goalId} and kp.knowledge_point_id=v.id
+         order by subject_order, v.sort_order, v.id
+    </select>
+
+    <select id="selectPracticeNode" resultType="org.dromara.certmuse.assessment.domain.KnowledgePracticeNodeRow">
+        with nodes as (<include refid="eligibleKnowledge"/>), bounds as (
+            select max(tree_depth) max_depth
+              from cm_knowledge_point
+             where syllabus_version_id=#{syllabusVersionId} and del_flag='0' and status='0'
+        ), visible as (
+            select kp.* from cm_knowledge_point kp join nodes n on n.id=kp.id
+             cross join bounds where kp.tree_depth &lt;= bounds.max_depth - 2
+        )
+        select v.id,v.parent_id,v.exam_subject_id,v.syllabus_number,v.syllabus_title,v.tree_depth,v.sort_order,v.importance
+          from visible v where v.id=#{knowledgePointId}
+           and v.tree_depth in (2,3)
+    </select>
+
+    <select id="selectQualifiedQuestions" resultType="org.dromara.certmuse.assessment.domain.KnowledgePracticeQuestionRow">
+        <include refid="qualifiedQuestions"/>
+        select q.question_id, q.revision_id, q.exam_subject_id,
+               coalesce(nullif(btrim(base.evidence_group_key), ''), concat('Q:', q.question_id)) evidence_group_key,
+               r.question_type,coalesce(r.difficulty, 'medium') difficulty,r.estimated_seconds,r.stem,r.analysis,r.answer::text answer_json,
+               coalesce((select jsonb_agg(jsonb_build_object('label',o.option_label,'content',o.option_text,'sortOrder',o.sort_order) order by o.sort_order,o.id) from cm_question_option o where o.question_revision_id=r.id),'[]')::text options_json,
+               coalesce((select jsonb_agg(jsonb_build_object('sourceUrl',im.source_url,'storagePath',im.storage_path,'altText',im.alt_text,'sortOrder',im.image_order) order by im.image_order,im.id) from cm_question_image im where im.question_revision_id=r.id),'[]')::text images_json,
+               coalesce((select jsonb_agg(jsonb_build_object('knowledgePointId',leaf.id::text,'knowledgePointName',leaf.syllabus_title,'examSubjectId',leaf.exam_subject_id::text,'relationRole','tested','sortOrder',leaf.sort_order) order by leaf.id) from (select distinct kp.id,kp.syllabus_title,kp.exam_subject_id,kp.sort_order from cm_question_knowledge qk join cm_knowledge_point kp on kp.id=qk.knowledge_point_id where qk.question_revision_id=r.id and qk.exam_subject_id=kp.exam_subject_id and kp.syllabus_version_id=#{syllabusVersionId} and kp.del_flag='0' and kp.status='0' and not exists (select 1 from cm_knowledge_point c where c.parent_id=kp.id and c.del_flag='0' and c.status='0')) leaf),'[]')::text knowledge_json,
+               '{}'::text grading_rules_json,
+               1.00 max_score
+          from qualified q join cm_question base on base.id=q.question_id join cm_question_revision r on r.id=q.revision_id
+         order by q.question_id
+    </select>
+
+    <select id="selectPublishedRuleVersion" resultType="long">select id from cm_profile_rule_version where status='published'</select>
+    <select id="selectIdempotency" resultType="org.dromara.certmuse.assessment.domain.KnowledgePracticeIdempotencyRow">
+        select id,payload_hash,status,resource_id,response_body::text from cm_idempotency_record
+         where action_code='START_KNOWLEDGE_PRACTICE' and request_id=#{requestId}
+    </select>
+    <insert id="insertIdempotency">
+        insert into cm_idempotency_record(id,action_code,request_id,payload_hash,status,expires_time)
+        values(#{id},'START_KNOWLEDGE_PRACTICE',#{requestId},#{payloadHash},'processing',now()+interval '24 hours')
+        on conflict do nothing
+    </insert>
+    <insert id="insertSession">
+        insert into cm_learning_session(id,user_id,goal_id,exam_subject_id,session_type,status,rule_version_id,request_id,
+            certification_id,syllabus_version_id,target_exam_year,target_exam_month,row_version)
+        values(#{id},#{userId},#{goal.id},#{subjectId},'self_practice','created',#{ruleVersionId},#{requestId},
+            #{goal.certificationId},#{goal.syllabusVersionId},#{goal.targetExamYear},#{goal.targetExamMonth},0)
+        on conflict do nothing
+    </insert>
+    <select id="selectActiveSession" resultType="org.dromara.certmuse.assessment.domain.KnowledgePracticeSessionRow">
+        select s.id,s.user_id,s.goal_id,s.request_id,count(sq.id) total_count
+          from cm_learning_session s left join cm_session_question sq on sq.session_id=s.id
+         where s.user_id=#{userId} and s.goal_id=#{goalId} and s.session_type='self_practice'
+           and s.status in ('created','in_progress') group by s.id
+         order by s.create_time desc,s.id desc limit 1
+    </select>
+    <select id="selectSessionByRequestId" resultType="org.dromara.certmuse.assessment.domain.KnowledgePracticeSessionRow">
+        select s.id,s.user_id,s.goal_id,s.request_id,count(sq.id) total_count
+          from cm_learning_session s left join cm_session_question sq on sq.session_id=s.id
+         where s.request_id=#{requestId} group by s.id
+    </select>
+    <select id="selectOwnedSession" resultType="org.dromara.certmuse.assessment.domain.KnowledgePracticeSessionRow">
+        select s.id,s.user_id,s.goal_id,s.request_id,count(sq.id) total_count
+          from cm_learning_session s left join cm_session_question sq on sq.session_id=s.id
+         where s.id=#{sessionId} and s.user_id=#{userId} group by s.id
+    </select>
+    <insert id="insertSessionQuestion">
+        insert into cm_session_question(id,session_id,question_id,question_revision_id,exam_subject_id,question_order,
+            evidence_group_key,difficulty_snapshot,estimated_seconds_snapshot,presentation_snapshot,grading_snapshot,
+            knowledge_snapshot,hint_allowed)
+        values(#{id},#{sessionId},#{question.questionId},#{question.revisionId},#{question.examSubjectId},#{questionOrder},
+            #{question.evidenceGroupKey},#{question.difficulty},#{question.estimatedSeconds},#{presentation}::jsonb,
+            #{grading}::jsonb,#{knowledge}::jsonb,true)
+    </insert>
+    <update id="completeIdempotency">
+        update cm_idempotency_record set status='succeeded',resource_type='cm_learning_session',resource_id=#{sessionId},
+               response_status=200,response_body=#{responseBody}::jsonb,update_time=now() where id=#{id} and status='processing'
+    </update>
+    <select id="selectAnsweringSession" resultType="org.dromara.certmuse.assessment.domain.KnowledgePracticeAnsweringSessionRow">
+        select s.id,s.user_id,s.goal_id,s.rule_version_id,s.status,count(distinct sq.id)::int total_count,
+               count(distinct a.id) filter (where a.status='submitted')::int submitted_count
+          from cm_learning_session s
+          left join cm_session_question sq on sq.session_id=s.id
+          left join cm_question_attempt a on a.session_question_id=sq.id and a.user_id=s.user_id and a.status='submitted'
+         where s.id=#{sessionId} and s.user_id=#{userId} and s.session_type in ('self_practice','reinforcement_practice')
+         group by s.id
+    </select>
+    <update id="startAnsweringSession">
+        update cm_learning_session set status='in_progress',started_time=coalesce(started_time,now()),
+               status_changed_time=now(),update_time=now()
+         where id=#{sessionId} and user_id=#{userId} and session_type in ('self_practice','reinforcement_practice') and status='created'
+    </update>
+    <select id="selectNavigation" resultType="org.dromara.certmuse.assessment.domain.KnowledgePracticeNavigationRow">
+        select sq.question_order,a.id is not null submitted,
+               case when a.id is null then null else aa.score_rate=1 end correct
+          from cm_session_question sq
+          left join cm_question_attempt a on a.session_question_id=sq.id and a.status='submitted'
+          left join cm_attempt_answer aa on aa.attempt_id=a.id
+         where sq.session_id=#{sessionId}
+         order by sq.question_order
+    </select>
+    <select id="selectAnsweringItem" resultType="org.dromara.certmuse.assessment.domain.KnowledgePracticeItemRow">
+        select sq.id session_question_id,s.id session_id,s.user_id,s.goal_id,s.rule_version_id,
+               sq.exam_subject_id,sq.evidence_group_key,sq.difficulty_snapshot,sq.question_order,s.status session_status,
+               (select count(*) from cm_session_question all_sq where all_sq.session_id=s.id)::int total_count,
+               sq.presentation_snapshot::text,sq.grading_snapshot::text,sq.knowledge_snapshot::text,
+               a.id attempt_id,aa.answer_data::text,
+               case when aa.score_rate is null then null else aa.score_rate=1 end correct
+          from cm_learning_session s join cm_session_question sq on sq.session_id=s.id
+          left join cm_question_attempt a on a.session_question_id=sq.id and a.user_id=s.user_id and a.status='submitted'
+          left join cm_attempt_answer aa on aa.attempt_id=a.id
+         where s.id=#{sessionId} and s.user_id=#{userId} and s.session_type in ('self_practice','reinforcement_practice')
+           and sq.question_order=#{questionOrder}
+    </select>
+    <select id="lockAnsweringSession" resultType="org.dromara.certmuse.assessment.domain.KnowledgePracticeAnsweringSessionRow">
+        select id,user_id,goal_id,rule_version_id,status from cm_learning_session
+         where id=#{sessionId} and user_id=#{userId} and session_type in ('self_practice','reinforcement_practice') for update
+    </select>
+    <select id="selectActionIdempotency" resultType="org.dromara.certmuse.assessment.domain.KnowledgePracticeIdempotencyRow">
+        select id,payload_hash,status,resource_id,response_body::text from cm_idempotency_record
+         where action_code=#{actionCode} and request_id=#{requestId}
+    </select>
+    <insert id="insertActionIdempotency">
+        insert into cm_idempotency_record(id,action_code,request_id,payload_hash,status,expires_time)
+        values(#{id},#{actionCode},#{requestId},#{payloadHash},'processing',now()+interval '24 hours')
+        on conflict do nothing
+    </insert>
+    <update id="succeedActionIdempotency">
+        update cm_idempotency_record set status='succeeded',resource_type=#{resourceType},resource_id=#{resourceId},
+               response_status=200,response_body=#{responseBody}::jsonb,update_time=now()
+         where id=#{id} and status='processing'
+    </update>
+    <insert id="insertAttempt">
+        insert into cm_question_attempt(id,session_question_id,user_id,attempt_no,status,create_request_id,submit_request_id,
+            submitted_time,timer_status,is_blank,is_skipped,is_first_attempt,is_repeat_attempt)
+        values(#{id},#{sessionQuestionId},#{userId},1,'submitted',#{requestId},#{requestId},now(),'missing',false,false,true,false)
+        on conflict do nothing
+    </insert>
+    <insert id="insertAttemptAnswer">
+        insert into cm_attempt_answer(id,attempt_id,answer_data,score,max_score,score_rate,grading_status,graded_time)
+        values(#{id},#{attemptId},#{answerData}::jsonb,case when #{correct} then 1.00 else 0.00 end,1.00,
+               case when #{correct} then 1.00000000 else 0.00000000 end,'graded',now())
+    </insert>
+    <insert id="insertErrorRecord">
+        insert into cm_error_record(id,user_id,goal_id,attempt_id,knowledge_point_id,evidence_group_key)
+        values(#{id},#{userId},#{goalId},#{attemptId},#{knowledgePointId},#{groupKey}) on conflict do nothing
+    </insert>
+    <select id="insertSingleSettlement" resultType="long">
+        insert into cm_profile_settlement(id,user_id,goal_id,exam_subject_id,knowledge_point_id,settlement_type,
+            source_session_id,source_attempt_id,scoring_revision_no,settlement_revision_no,settlement_snapshot,
+            entry_direct_ability,evidence_count,aggregate_evidence_value,positive_ratio,negative_ratio,
+            effective_impact_coefficient,tentative_direct_ability,final_direct_ability,status,rule_version_id,request_id,settled_time)
+        values(#{id},#{item.userId},#{item.goalId},#{item.examSubjectId},#{knowledgePointId},'single',#{item.sessionId},
+            #{attemptId},1,1,'{"schema_version":"knowledge_practice_settlement/1.0"}'::jsonb,
+            coalesce((select current_direct_ability from cm_knowledge_profile where user_id=#{item.userId}
+                and goal_id=#{item.goalId} and knowledge_point_id=#{knowledgePointId}),50),1,
+            case when #{correct} then 85 else 25 end,case when #{correct} then 1 else 0 end,
+            case when #{correct} then 0 else 1 end,1,
+            (coalesce((select current_direct_ability from cm_knowledge_profile where user_id=#{item.userId}
+                and goal_id=#{item.goalId} and knowledge_point_id=#{knowledgePointId}),50)*3+
+                case when #{correct} then 85 else 25 end)/4,
+            (coalesce((select current_direct_ability from cm_knowledge_profile where user_id=#{item.userId}
+                and goal_id=#{item.goalId} and knowledge_point_id=#{knowledgePointId}),50)*3+
+                case when #{correct} then 85 else 25 end)/4,'settled',#{item.ruleVersionId},#{requestId},now())
+        on conflict(source_attempt_id,knowledge_point_id,scoring_revision_no) where settlement_type='single'
+        do update set id=cm_profile_settlement.id returning id
+    </select>
+    <insert id="insertPracticeEvidence">
+        insert into cm_learning_evidence(id,settlement_id,user_id,goal_id,session_id,attempt_id,
+            exam_subject_id,knowledge_point_id,evidence_group_key,behavior_type,difficulty_snapshot,score_rate,
+            raw_evidence_value,direction,hint_level,elapsed_seconds,timer_status,hint_coefficient,time_coefficient,
+            combined_coefficient,behavior_coefficient,streak_coefficient,is_distinct_question,is_valid,rule_version_id,
+            answered_at,effective_at,settlement_sequence)
+        values(#{id},#{settlementId},#{item.userId},#{item.goalId},#{item.sessionId},#{attemptId},#{item.examSubjectId},
+            #{knowledgePointId},#{item.evidenceGroupKey},'knowledge_practice',#{item.difficultySnapshot},
+            case when #{correct} then 1 else 0 end,case when #{correct} then 85 else 25 end,
+            case when #{correct} then 'positive' else 'negative' end,'none',null,'missing',1,1,1,1,1,
+            not exists(select 1 from cm_learning_evidence e where e.user_id=#{item.userId} and e.goal_id=#{item.goalId}
+                and e.knowledge_point_id=#{knowledgePointId} and e.evidence_group_key=#{item.evidenceGroupKey}
+                and e.is_valid=true and e.is_distinct_question=true),true,#{item.ruleVersionId},now(),now(),
+            coalesce((select max(e.settlement_sequence)+1 from cm_learning_evidence e where e.user_id=#{item.userId}
+                and e.goal_id=#{item.goalId} and e.knowledge_point_id=#{knowledgePointId}),1))
+        on conflict(attempt_id,knowledge_point_id) where is_valid=true do nothing
+    </insert>
+    <insert id="upsertPracticeKnowledgeProfile">
+        insert into cm_knowledge_profile(id,user_id,goal_id,knowledge_point_id,baseline_direct_ability,current_direct_ability,
+            confidence_level,profile_status,distinct_question_count,last_direct_evidence_time,recent_trend,rule_version_id,calculated_time)
+        values(#{id},#{item.userId},#{item.goalId},#{knowledgePointId},50,
+            (50*3+case when #{correct} then 85 else 25 end)/4,'low','provisional',1,now(),'stable',#{item.ruleVersionId},now())
+        on conflict(user_id,goal_id,knowledge_point_id) do update set
+            current_direct_ability=(coalesce(cm_knowledge_profile.current_direct_ability,50)*3+
+                case when #{correct} then 85 else 25 end)/4,
+            distinct_question_count=(select count(*) from cm_learning_evidence e where e.user_id=#{item.userId}
+                and e.goal_id=#{item.goalId} and e.knowledge_point_id=#{knowledgePointId}
+                and e.is_valid=true and e.is_distinct_question=true),
+            confidence_level=case when (select count(*) from cm_learning_evidence e where e.user_id=#{item.userId}
+                and e.goal_id=#{item.goalId} and e.knowledge_point_id=#{knowledgePointId}
+                and e.is_valid=true and e.is_distinct_question=true)&lt;=1 then 'low' else 'medium' end,
+            profile_status=case when (select count(*) from cm_learning_evidence e where e.user_id=#{item.userId}
+                and e.goal_id=#{item.goalId} and e.knowledge_point_id=#{knowledgePointId}
+                and e.is_valid=true and e.is_distinct_question=true)&lt;=1 then 'provisional'
+                when (coalesce(cm_knowledge_profile.current_direct_ability,50)*3+case when #{correct} then 85 else 25 end)/4&lt;40 then 'urgent'
+                when (coalesce(cm_knowledge_profile.current_direct_ability,50)*3+case when #{correct} then 85 else 25 end)/4&lt;60 then 'weak'
+                when (coalesce(cm_knowledge_profile.current_direct_ability,50)*3+case when #{correct} then 85 else 25 end)/4&lt;75 then 'learning'
+                when (coalesce(cm_knowledge_profile.current_direct_ability,50)*3+case when #{correct} then 85 else 25 end)/4&lt;85 then 'proficient'
+                else 'mastery_candidate' end,
+            last_direct_evidence_time=now(),rule_version_id=#{item.ruleVersionId},calculated_time=now(),
+            row_version=cm_knowledge_profile.row_version+1,update_time=now()
+    </insert>
+    <insert id="insertPracticeKnowledgeChange">
+        insert into cm_profile_change(id,profile_level,knowledge_profile_id,settlement_id,change_type,after_data,
+            rule_version_id,request_id)
+        select #{id},'knowledge',p.id,#{settlementId},'answer',
+               jsonb_build_object('schema_version','profile_change/1.0','ability',p.current_direct_ability,
+                                  'status',p.profile_status,'confidence',p.confidence_level),
+               #{item.ruleVersionId},#{requestId}
+          from cm_knowledge_profile p where p.user_id=#{item.userId} and p.goal_id=#{item.goalId}
+           and p.knowledge_point_id=#{knowledgePointId}
+        on conflict(request_id) do nothing
+    </insert>
+    <select id="selectParentAggregates" resultType="org.dromara.certmuse.assessment.domain.KnowledgePracticeParentAggregateRow">
+        with recursive active as (
+            select kp.id,kp.parent_id,kp.importance from cm_knowledge_point kp
+             join cm_user_goal g on g.syllabus_version_id=kp.syllabus_version_id and g.id=#{goalId}
+            where kp.del_flag='0' and kp.status='0'
+        ), parents as (select * from active where exists(select 1 from active c where c.parent_id=active.id)),
+        leaves as (select * from active where not exists(select 1 from active c where c.parent_id=active.id)),
+        closure as (
+            select p.id parent_id,c.id descendant_id from parents p join active c on c.parent_id=p.id
+            union all select cl.parent_id,c.id from closure cl join active c on c.parent_id=cl.descendant_id
+        ), mapped as (
+            select distinct cl.parent_id,l.id leaf_id,l.importance from closure cl join leaves l on l.id=cl.descendant_id
+        )
+        select m.parent_id knowledge_point_id,
+               sum(p.current_direct_ability*m.importance)/nullif(sum(m.importance),0) ability,
+               count(p.id)::int assessed_leaf_count,
+               case when count(p.id)=0 then 'unassessed' when bool_and(p.confidence_level in('medium','high')) then 'medium' else 'low' end confidence,
+               case when count(p.id)=0 then 'unassessed'
+                    when sum(p.current_direct_ability*m.importance)/nullif(sum(m.importance),0)&lt;40 then 'urgent'
+                    when sum(p.current_direct_ability*m.importance)/nullif(sum(m.importance),0)&lt;60 then 'weak'
+                    when sum(p.current_direct_ability*m.importance)/nullif(sum(m.importance),0)&lt;75 then 'learning'
+                    when sum(p.current_direct_ability*m.importance)/nullif(sum(m.importance),0)&lt;85 then 'proficient'
+                    else 'mastery_candidate' end status
+          from mapped m left join cm_knowledge_profile p on p.knowledge_point_id=m.leaf_id
+               and p.user_id=#{userId} and p.goal_id=#{goalId}
+         group by m.parent_id order by m.parent_id
+    </select>
+    <insert id="upsertParentProfile">
+        insert into cm_knowledge_profile(id,user_id,goal_id,knowledge_point_id,current_direct_ability,confidence_level,
+            profile_status,distinct_question_count,recent_trend,rule_version_id,calculated_time)
+        values(#{id},#{userId},#{goalId},#{aggregate.knowledgePointId},#{aggregate.ability},#{aggregate.confidence},
+            #{aggregate.status},#{aggregate.assessedLeafCount},'stable',#{ruleVersionId},now())
+        on conflict(user_id,goal_id,knowledge_point_id) do update set current_direct_ability=excluded.current_direct_ability,
+            confidence_level=excluded.confidence_level,profile_status=excluded.profile_status,
+            distinct_question_count=excluded.distinct_question_count,rule_version_id=excluded.rule_version_id,
+            calculated_time=now(),row_version=cm_knowledge_profile.row_version+1,update_time=now()
+    </insert>
+    <update id="aggregateSubjectProfiles">
+        update cm_subject_profile sp set
+            knowledge_aggregate_score=x.ability,subject_ability=x.ability,target_coverage_rate=x.coverage,
+            medium_high_coverage_rate=x.confident_coverage,confidence_level=x.confidence,
+            rule_version_id=#{ruleVersionId},calculated_time=now(),row_version=sp.row_version+1,update_time=now()
+        from (select kp.exam_subject_id,
+                     sum(p.current_direct_ability*kp.importance)/nullif(sum(kp.importance),0) ability,
+                     count(p.id)::numeric/nullif(count(*)::numeric,0) coverage,
+                     count(p.id) filter(where p.confidence_level in('medium','high'))::numeric/nullif(count(*)::numeric,0) confident_coverage,
+                     case when count(p.id)=0 then 'unassessed' when bool_and(p.confidence_level in('medium','high')) then 'medium' else 'low' end confidence
+                from cm_knowledge_point kp left join cm_knowledge_profile p on p.knowledge_point_id=kp.id
+                    and p.user_id=#{userId} and p.goal_id=#{goalId}
+               where kp.del_flag='0' and kp.status='0'
+                 and not exists(select 1 from cm_knowledge_point c where c.parent_id=kp.id and c.del_flag='0' and c.status='0')
+               group by kp.exam_subject_id) x
+        where sp.user_id=#{userId} and sp.goal_id=#{goalId} and sp.exam_subject_id=x.exam_subject_id
+    </update>
+    <update id="aggregateOverallProfile">
+        update cm_overall_profile op set overall_ability=x.ability,rule_version_id=#{ruleVersionId},calculated_time=now(),
+            row_version=op.row_version+1,update_time=now()
+        from (select sum(p.current_direct_ability*kp.importance)/nullif(sum(kp.importance),0) ability
+                from cm_knowledge_point kp join cm_knowledge_profile p on p.knowledge_point_id=kp.id
+               where p.user_id=#{userId} and p.goal_id=#{goalId} and kp.del_flag='0' and kp.status='0'
+                 and not exists(select 1 from cm_knowledge_point c where c.parent_id=kp.id and c.del_flag='0' and c.status='0')) x
+        where op.user_id=#{userId} and op.goal_id=#{goalId}
+    </update>
+    <select id="countSubmittedItems" resultType="int">
+        select count(*) from cm_question_attempt a join cm_session_question sq on sq.id=a.session_question_id
+         where sq.session_id=#{sessionId} and a.status='submitted'
+    </select>
+    <update id="submitAnsweringSession">
+        update cm_learning_session set started_time=coalesce(started_time,now()),status='submitted',
+               submitted_time=coalesce(submitted_time,now()),status_changed_time=now(),update_time=now()
+         where id=#{sessionId} and user_id=#{userId} and session_type in ('self_practice','reinforcement_practice')
+           and status in('created','in_progress')
+    </update>
+    <update id="settleAnsweringSession">
+        update cm_learning_session set status='settling',status_changed_time=now(),update_time=now()
+         where id=#{sessionId} and user_id=#{userId} and session_type in ('self_practice','reinforcement_practice') and status='submitted'
+    </update>
+    <update id="completeAnsweringSession">
+        update cm_learning_session set status='completed',settled_time=coalesce(settled_time,now()),
+               status_changed_time=now(),update_time=now()
+         where id=#{sessionId} and user_id=#{userId} and session_type in ('self_practice','reinforcement_practice') and status='settling'
+    </update>
+
+    <insert id="insertInitialReinforcement">
+        insert into cm_reinforcement_round(id,user_id,source_session_id,source_question_order,source_question_id,
+            source_evidence_group_key,source_difficulty,goal_id,syllabus_version_id,exam_subject_id,round_no,status,
+            knowledge_snapshot,source_presentation_snapshot,source_correct,recommendation_reason,recommendation_source,
+            estimated_count)
+        select #{id},s.user_id,s.id,sq.question_order,sq.question_id,sq.evidence_group_key,
+               coalesce(sq.difficulty_snapshot,'medium'),s.goal_id,s.syllabus_version_id,sq.exam_subject_id,1,'READY',
+               sq.knowledge_snapshot,sq.presentation_snapshot,#{correct},
+               case when #{correct} then '点击开始强化后，将生成学习建议并从题库抽取同知识点题目。'
+                    else '点击开始强化后，将生成学习建议并从题库抽取同知识点题目。' end,
+               'RULE',3
+          from cm_learning_session s join cm_session_question sq on sq.session_id=s.id
+         where s.id=#{sessionId} and s.user_id=#{userId} and s.session_type='self_practice'
+           and sq.question_order=#{questionOrder}
+        on conflict(user_id,source_session_id,source_question_order,round_no) do nothing
+    </insert>
+    <select id="selectReinforcementBySource" resultType="org.dromara.certmuse.assessment.domain.ReinforcementRoundRow">
+        select id,user_id,source_session_id,source_question_order,source_question_id,source_evidence_group_key,
+               source_difficulty,goal_id,syllabus_version_id,exam_subject_id,round_no,previous_round_id,
+               reinforcement_session_id,status,knowledge_snapshot::text,source_presentation_snapshot::text,
+               source_correct,recommendation_reason,recommendation_source,estimated_count,request_id,error_code
+          from cm_reinforcement_round where user_id=#{userId} and source_session_id=#{sessionId}
+           and source_question_order=#{questionOrder} order by round_no desc limit 1
+    </select>
+    <select id="selectReinforcementRound" resultType="org.dromara.certmuse.assessment.domain.ReinforcementRoundRow">
+        select id,user_id,source_session_id,source_question_order,source_question_id,source_evidence_group_key,
+               source_difficulty,goal_id,syllabus_version_id,exam_subject_id,round_no,previous_round_id,
+               reinforcement_session_id,status,knowledge_snapshot::text,source_presentation_snapshot::text,
+               source_correct,recommendation_reason,recommendation_source,estimated_count,request_id,error_code
+          from cm_reinforcement_round where id=#{roundId} and user_id=#{userId}
+    </select>
+    <select id="lockReinforcementRound" resultType="org.dromara.certmuse.assessment.domain.ReinforcementRoundRow">
+        select id,user_id,source_session_id,source_question_order,source_question_id,source_evidence_group_key,
+               source_difficulty,goal_id,syllabus_version_id,exam_subject_id,round_no,previous_round_id,
+               reinforcement_session_id,status,knowledge_snapshot::text,source_presentation_snapshot::text,
+               source_correct,recommendation_reason,recommendation_source,estimated_count,request_id,error_code
+          from cm_reinforcement_round where id=#{roundId} and user_id=#{userId} for update
+    </select>
+    <update id="updateReinforcementRecommendation">
+        update cm_reinforcement_round set status=#{status},recommendation_reason=#{reason},
+               recommendation_source=#{source},estimated_count=#{estimatedCount},error_code=#{errorCode},update_time=now()
+         where id=#{roundId} and status in ('PREPARING','READY')
+    </update>
+    <update id="dismissReinforcement">
+        update cm_reinforcement_round set status='DISMISSED',update_time=now()
+         where id=#{roundId} and user_id=#{userId} and status='READY'
+    </update>
+
+    <select id="selectReinforcementCandidates" resultType="org.dromara.certmuse.assessment.domain.KnowledgePracticeQuestionRow">
+        with targets as (
+            select (x-&gt;&gt;'knowledgePointId')::bigint id from jsonb_array_elements(#{round.knowledgeSnapshot}::jsonb-&gt;'items') x
+             where coalesce(x-&gt;&gt;'relationRole','tested')='tested'
+        ), latest as (
+            select distinct on (r.question_id) r.* from cm_question_revision r
+             where r.status='published' order by r.question_id,r.revision_no desc,r.id desc
+        ), ranked as (
+            select q.id question_id,r.id revision_id,r.question_type,coalesce(r.difficulty,'medium') difficulty,
+                   r.estimated_seconds,r.stem,r.analysis,r.answer::text answer_json,q.evidence_group_key,
+                   count(distinct qk.knowledge_point_id)::int knowledge_overlap
+              from cm_question q join latest r on r.question_id=q.id
+              join cm_question_knowledge qk on qk.question_id=q.id and qk.question_revision_id=r.id
+              join targets t on t.id=qk.knowledge_point_id
+             where q.del_flag='0' and q.id&lt;&gt;#{round.sourceQuestionId}
+               and coalesce(nullif(btrim(q.evidence_group_key),''),concat('Q:',q.id))&lt;&gt;#{round.sourceEvidenceGroupKey}
+               and qk.exam_subject_id=#{round.examSubjectId}
+               and <include refid="snapshotEligibility"/>
+               and not exists (
+                   select 1 from cm_question_attempt a join cm_session_question done_sq on done_sq.id=a.session_question_id
+                   join cm_learning_session done_s on done_s.id=done_sq.session_id
+                    where a.user_id=#{round.userId} and a.status='submitted' and done_s.goal_id=#{round.goalId}
+                      and done_s.syllabus_version_id=#{round.syllabusVersionId} and done_sq.question_id=q.id)
+               and not exists (
+                   select 1 from cm_reinforcement_round rr join cm_session_question used on used.session_id=rr.reinforcement_session_id
+                    where rr.user_id=#{round.userId} and rr.source_session_id=#{round.sourceSessionId}
+                      and rr.source_question_order=#{round.sourceQuestionOrder} and used.question_id=q.id)
+             group by q.id,r.id,r.question_type,r.difficulty,r.estimated_seconds,r.stem,r.analysis,r.answer,q.evidence_group_key
+        )
+        select ranked.question_id,ranked.revision_id,#{round.examSubjectId} exam_subject_id,
+               coalesce(nullif(btrim(ranked.evidence_group_key),''),concat('Q:',ranked.question_id)) evidence_group_key,
+               ranked.question_type,ranked.difficulty,ranked.estimated_seconds,ranked.stem,ranked.analysis,ranked.answer_json,
+               coalesce((select jsonb_agg(jsonb_build_object('label',o.option_label,'content',o.option_text,'sortOrder',o.sort_order) order by o.sort_order,o.id) from cm_question_option o where o.question_revision_id=ranked.revision_id),'[]')::text options_json,
+               coalesce((select jsonb_agg(jsonb_build_object('sourceUrl',im.source_url,'storagePath',im.storage_path,'altText',im.alt_text,'sortOrder',im.image_order) order by im.image_order,im.id) from cm_question_image im where im.question_revision_id=ranked.revision_id),'[]')::text images_json,
+               coalesce((select jsonb_agg(jsonb_build_object('knowledgePointId',kp.id::text,'knowledgePointName',kp.syllabus_title,'examSubjectId',kp.exam_subject_id::text,'relationRole','tested','sortOrder',kp.sort_order) order by kp.id) from cm_question_knowledge all_qk join cm_knowledge_point kp on kp.id=all_qk.knowledge_point_id where all_qk.question_revision_id=ranked.revision_id and kp.syllabus_version_id=#{round.syllabusVersionId} and kp.del_flag='0' and kp.status='0'),'[]')::text knowledge_json,
+               '{}'::text grading_rules_json,1.00 max_score,ranked.knowledge_overlap,
+               abs((case ranked.difficulty when 'easy' then 1 when 'medium' then 2 when 'hard' then 3 else 2 end)-
+                   (case #{round.sourceDifficulty} when 'easy' then 1 when 'medium' then 2 when 'hard' then 3 else 2 end)) difficulty_distance
+          from ranked order by knowledge_overlap desc,difficulty_distance,question_id limit 3
+    </select>
+    <insert id="insertReinforcementSession">
+        insert into cm_learning_session(id,user_id,goal_id,exam_subject_id,session_type,status,rule_version_id,request_id,
+            certification_id,syllabus_version_id,target_exam_year,target_exam_month,row_version)
+        select #{id},#{round.userId},g.id,#{round.examSubjectId},'reinforcement_practice','created',#{ruleVersionId},#{requestId},
+               g.certification_id,g.syllabus_version_id,g.target_exam_year,g.target_exam_month,0
+          from cm_user_goal g where g.id=#{round.goalId} and g.user_id=#{round.userId} and g.status='active'
+           and g.syllabus_version_id=#{round.syllabusVersionId}
+    </insert>
+    <update id="startReinforcementRound">
+        update cm_reinforcement_round set status='STARTED',reinforcement_session_id=#{sessionId},
+               request_id=#{requestId},estimated_count=#{count},update_time=now()
+         where id=#{roundId} and user_id=#{userId} and status='READY'
+    </update>
+    <update id="completeReinforcementRound">
+        update cm_reinforcement_round set status='COMPLETED',completed_time=now(),update_time=now()
+         where reinforcement_session_id=#{sessionId} and user_id=#{userId} and status='STARTED'
+    </update>
+    <insert id="insertNextReinforcement">
+        insert into cm_reinforcement_round(id,user_id,source_session_id,source_question_order,source_question_id,
+            source_evidence_group_key,source_difficulty,goal_id,syllabus_version_id,exam_subject_id,round_no,
+            previous_round_id,status,knowledge_snapshot,source_presentation_snapshot,source_correct,
+            recommendation_reason,recommendation_source,request_id)
+        values(#{id},#{previous.userId},#{previous.sourceSessionId},#{previous.sourceQuestionOrder},#{previous.sourceQuestionId},
+            #{previous.sourceEvidenceGroupKey},#{previous.sourceDifficulty},#{previous.goalId},#{previous.syllabusVersionId},
+            #{previous.examSubjectId},#{previous.roundNo}+1,#{previous.id},'READY',#{previous.knowledgeSnapshot}::jsonb,
+            #{previous.sourcePresentationSnapshot}::jsonb,#{previous.sourceCorrect},#{previous.recommendationReason},
+            #{previous.recommendationSource},#{requestId}) on conflict do nothing
+    </insert>
+    <select id="selectReinforcementResults" resultType="org.dromara.certmuse.assessment.domain.KnowledgePracticeNavigationRow">
+        select sq.question_order,true submitted,coalesce(aa.score_rate=1,false) correct
+          from cm_reinforcement_round rr join cm_session_question sq on sq.session_id=rr.reinforcement_session_id
+          left join cm_question_attempt a on a.session_question_id=sq.id and a.user_id=rr.user_id and a.status='submitted'
+          left join cm_attempt_answer aa on aa.attempt_id=a.id where rr.id=#{roundId} order by sq.question_order
+    </select>
+</mapper>

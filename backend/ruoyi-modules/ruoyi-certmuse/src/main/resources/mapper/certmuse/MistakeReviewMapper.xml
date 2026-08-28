@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.dromara.certmuse.learning.mapper.MistakeReviewMapper">
+    <select id="selectActiveGoal" resultType="long">
+        select min(id) from cm_user_goal where user_id=#{userId} and status='active' having count(*)=1
+    </select>
+    <select id="lockActiveGoal" resultType="long">
+        with active as (select min(id) id from cm_user_goal where user_id=#{userId} and status='active' having count(*)=1)
+        select g.id from cm_user_goal g join active on active.id=g.id for update
+    </select>
+    <select id="selectUniquePublishedRuleVersion" resultType="long">select min(id) from cm_profile_rule_version where status='published' having count(*)=1</select>
+    <select id="selectErrors" resultType="org.dromara.certmuse.learning.domain.MistakeErrorRow">
+        select e.id error_record_id,e.user_id,e.goal_id,sq.question_id,sq.question_revision_id,sq.id session_question_id,
+               a.id attempt_id,s.session_type,e.status error_status,e.status_reason,cast(e.detected_time as text) detected_time,a.is_skipped skipped,
+               sq.evidence_group_key,sq.exam_subject_id,sq.difficulty_snapshot,sq.estimated_seconds_snapshot,sq.presentation_snapshot::text,
+               sq.grading_snapshot::text,sq.knowledge_snapshot::text,sq.ai_rubric_snapshot::text ai_rubric_snapshot,aa.answer_data::text,
+               coalesce((select jsonb_agg(jsonb_build_object('id',kp.id::text,'name',kp.syllabus_title)
+                                            order by kp.sort_order,kp.id)
+                           from jsonb_array_elements(case when jsonb_typeof(sq.knowledge_snapshot->'items') = 'array'
+                                                          then sq.knowledge_snapshot->'items' else '[]'::jsonb end) frozen
+                           join cm_knowledge_point kp on kp.id=(frozen->>'knowledgePointId')::bigint
+                            and kp.syllabus_version_id=goal.syllabus_version_id and kp.status='0' and kp.del_flag='0'
+                          where not exists (select 1 from cm_knowledge_point child
+                                             where child.parent_id=kp.id and child.status='0' and child.del_flag='0')),
+                        '[]'::jsonb)::text current_knowledge_points
+          from cm_error_record e join cm_user_goal goal on goal.id=e.goal_id
+          join cm_question_attempt a on a.id=e.attempt_id
+          join cm_session_question sq on sq.id=a.session_question_id join cm_learning_session s on s.id=sq.session_id
+          left join cm_attempt_answer aa on aa.attempt_id=a.id
+         where e.user_id=#{userId} and e.goal_id=#{goalId}
+           and s.session_type in ('initial_diagnosis','daily_task','task_test','self_practice','simulation','past_paper_practice','past_paper_exam')
+         order by e.detected_time desc,a.id desc,e.id desc
+    </select>
+    <select id="selectActiveSession" resultType="org.dromara.certmuse.learning.domain.MistakeSessionRow">
+        select s.id,s.user_id,s.goal_id,s.rule_version_id,s.status,count(sq.id)::int total_count,
+               count(a.id) filter(where a.status='submitted')::int submitted_count
+          from cm_learning_session s left join cm_session_question sq on sq.session_id=s.id
+          left join cm_question_attempt a on a.session_question_id=sq.id and a.status='submitted'
+         where s.user_id=#{userId} and s.goal_id=#{goalId} and s.session_type='correction'
+           and s.status in ('created','in_progress','submitted','settling') group by s.id
+    </select>
+    <select id="selectOwnedSession" resultType="org.dromara.certmuse.learning.domain.MistakeSessionRow">
+        select s.id,s.user_id,s.goal_id,s.rule_version_id,s.status,count(sq.id)::int total_count,
+               count(a.id) filter(where a.status='submitted')::int submitted_count
+          from cm_learning_session s left join cm_session_question sq on sq.session_id=s.id
+          left join cm_question_attempt a on a.session_question_id=sq.id and a.status='submitted'
+         where s.id=#{sessionId} and s.user_id=#{userId} and s.session_type='correction' group by s.id
+    </select>
+    <select id="lockOwnedSession" resultType="org.dromara.certmuse.learning.domain.MistakeSessionRow">
+        with locked_session as (
+            select id,user_id,goal_id,rule_version_id,status
+              from cm_learning_session
+             where id=#{sessionId} and user_id=#{userId} and session_type='correction'
+             for update
+        )
+        select s.id,s.user_id,s.goal_id,s.rule_version_id,s.status,count(sq.id)::int total_count,
+               count(a.id) filter(where a.status='submitted')::int submitted_count
+          from locked_session s left join cm_session_question sq on sq.session_id=s.id
+          left join cm_question_attempt a on a.session_question_id=sq.id and a.status='submitted'
+         group by s.id,s.user_id,s.goal_id,s.rule_version_id,s.status
+    </select>
+    <update id="startSession">update cm_learning_session set status='in_progress',started_time=coalesce(started_time,now()),status_changed_time=now(),update_time=now() where id=#{sessionId} and user_id=#{userId} and session_type='correction' and status='created'</update>
+    <insert id="insertSession">insert into cm_learning_session(id,user_id,goal_id,session_type,status,rule_version_id,request_id) values(#{id},#{userId},#{goalId},'correction','created',#{ruleVersionId},#{requestId}) on conflict do nothing</insert>
+    <insert id="insertSessionQuestion">insert into cm_session_question(id,session_id,question_id,question_revision_id,exam_subject_id,question_order,evidence_group_key,difficulty_snapshot,estimated_seconds_snapshot,presentation_snapshot,grading_snapshot,knowledge_snapshot,ai_rubric_snapshot,hint_allowed) values(#{id},#{sessionId},#{source.questionId},#{source.questionRevisionId},#{source.examSubjectId},#{questionOrder},#{source.evidenceGroupKey},#{source.difficultySnapshot},#{source.estimatedSecondsSnapshot},#{source.presentationSnapshot}::jsonb,#{source.gradingSnapshot}::jsonb,#{source.knowledgeSnapshot}::jsonb,#{source.aiRubricSnapshot}::jsonb,false)</insert>
+    <select id="selectItem" resultType="org.dromara.certmuse.learning.domain.MistakeSessionItemRow">
+        select sq.id session_question_id,sq.question_id,sq.question_revision_id,sq.ai_rubric_snapshot::text ai_rubric_snapshot,s.id session_id,s.user_id,s.goal_id,sq.question_order,s.status session_status,
+               (select count(*) from cm_session_question x where x.session_id=s.id)::int total_count,sq.presentation_snapshot::text,sq.grading_snapshot::text,sq.knowledge_snapshot::text,sq.exam_subject_id,sq.evidence_group_key,sq.difficulty_snapshot,a.id attempt_id,aa.answer_data::text,aa.grading_status,aa.grading_result::text grading_result,case when aa.score_rate is null then null else aa.score_rate=1 end correct
+          from cm_learning_session s join cm_session_question sq on sq.session_id=s.id left join cm_question_attempt a on a.session_question_id=sq.id and a.status='submitted' left join cm_attempt_answer aa on aa.attempt_id=a.id
+         where s.id=#{sessionId} and s.user_id=#{userId} and s.session_type='correction' and sq.question_order=#{questionOrder}
+    </select>
+    <select id="selectItems" resultType="org.dromara.certmuse.learning.domain.MistakeSessionItemRow">select * from (select sq.id session_question_id,sq.question_id,sq.question_revision_id,sq.ai_rubric_snapshot::text ai_rubric_snapshot,sq.question_order,a.id attempt_id,aa.answer_data::text,aa.grading_status,aa.grading_result::text grading_result,case when aa.score_rate is null then null else aa.score_rate=1 end correct from cm_learning_session s join cm_session_question sq on sq.session_id=s.id left join cm_question_attempt a on a.session_question_id=sq.id and a.status='submitted' left join cm_attempt_answer aa on aa.attempt_id=a.id where s.id=#{sessionId} and s.user_id=#{userId} and s.session_type='correction') x order by question_order</select>
+    <insert id="insertAttempt">insert into cm_question_attempt(id,session_question_id,user_id,attempt_no,status,create_request_id,submit_request_id,submitted_time,timer_status,is_blank,is_skipped,is_first_attempt,is_repeat_attempt) values(#{id},#{item.sessionQuestionId},#{item.userId},1,'submitted',#{requestId},#{requestId},now(),'missing',false,false,true,false) on conflict do nothing</insert>
+    <insert id="insertAttemptAnswer">insert into cm_attempt_answer(id,attempt_id,answer_data,score,max_score,score_rate,grading_status,graded_time) values(#{id},#{attemptId},#{answerData}::jsonb,case when #{correct} then 1 else 0 end,1,case when #{correct} then 1 else 0 end,'graded',now())</insert>
+    <insert id="insertPendingSubjectiveAttemptAnswer">insert into cm_attempt_answer(id,attempt_id,answer_data,max_score,grading_status) values(#{id},#{attemptId},#{answerData}::jsonb,1,'pending')</insert>
+    <update id="scoreSubjectiveAttempt">update cm_attempt_answer set score=#{scoreRate}::numeric,max_score=1,score_rate=#{scoreRate}::numeric,grading_status='graded',grading_result=#{result}::jsonb,graded_time=now() where attempt_id=#{attemptId} and grading_status='pending'</update>
+    <update id="failSubjectiveAttempt">update cm_attempt_answer set score=0,max_score=1,score_rate=0,grading_status='failed',grading_result=#{result}::jsonb,graded_time=now() where attempt_id=#{attemptId} and grading_status='pending'</update>
+    <select id="lockPendingErrorIds" resultType="long">select e.id from cm_error_record e join cm_question_attempt a on a.id=e.attempt_id join cm_session_question sq on sq.id=a.session_question_id where e.user_id=#{userId} and e.goal_id=#{goalId} and sq.question_id=#{questionId} and e.status in ('unresolved','correcting') order by e.id for update</select>
+    <insert id="insertCorrection">insert into cm_correction_record(id,error_record_id,correction_attempt_id,status,score_rate,request_id,submitted_time,settled_time) values(#{id},#{errorRecordId},#{attemptId},'success',1,#{requestId},now(),now()) on conflict(error_record_id) do nothing</insert>
+    <update id="closeError">update cm_error_record set status='closed',status_reason='correction_correct',resolved_time=now(),status_changed_by=#{userId},status_changed_time=now(),update_time=now() where id=#{errorRecordId}</update>
+    <select id="countSubmitted" resultType="int">select count(*) from cm_question_attempt a join cm_session_question sq on sq.id=a.session_question_id where sq.session_id=#{sessionId} and a.status='submitted'</select>
+    <select id="countPendingGrading" resultType="int">select count(*) from cm_attempt_answer aa join cm_question_attempt a on a.id=aa.attempt_id join cm_session_question sq on sq.id=a.session_question_id where sq.session_id=#{sessionId} and aa.grading_status in ('pending','processing')</select>
+    <update id="submitSession">update cm_learning_session set status='submitted',submitted_time=coalesce(submitted_time,now()),status_changed_time=now(),update_time=now() where id=#{sessionId} and user_id=#{userId} and session_type='correction' and status='in_progress'</update>
+    <update id="settleSession">update cm_learning_session set status='settling',status_changed_time=now(),update_time=now() where id=#{sessionId} and user_id=#{userId} and status='submitted'</update>
+    <update id="completeSession">update cm_learning_session set status='completed',settled_time=coalesce(settled_time,now()),status_changed_time=now(),update_time=now() where id=#{sessionId} and user_id=#{userId} and status='settling'</update>
+    <select id="selectIdempotency" resultType="org.dromara.certmuse.learning.domain.MistakeIdempotencyRow">select id,payload_hash,status,resource_id,response_body::text from cm_idempotency_record where action_code=#{actionCode} and request_id=#{requestId}</select>
+    <insert id="insertIdempotency">insert into cm_idempotency_record(id,action_code,request_id,payload_hash,status,expires_time) values(#{id},#{actionCode},#{requestId},#{payloadHash},'processing',now()+interval '24 hours') on conflict do nothing</insert>
+    <update id="completeIdempotency">update cm_idempotency_record set status='succeeded',resource_id=#{resourceId},response_status=200,response_body=#{responseBody}::jsonb,update_time=now() where id=#{id} and status='processing'</update>
+</mapper>

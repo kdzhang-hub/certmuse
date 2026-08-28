@@ -1,0 +1,12 @@
+.git
+.idea
+.vscode
+**/node_modules
+**/.m2
+**/target/*
+!backend/ruoyi-admin/target/ruoyi-admin.jar
+**/dist
+**/.cache
+**/.vite
+**/*.log
+tools/ops/local

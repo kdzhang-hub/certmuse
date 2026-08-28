@@ -1,0 +1,1126 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.dromara.certmuse.catalog.mapper.ImportMapper">
+    <resultMap id="batchResultMap" type="org.dromara.certmuse.catalog.domain.CmImportBatch">
+        <constructor>
+            <idArg column="id" javaType="_long"/><arg column="request_id" javaType="String"/><arg column="document_id" javaType="java.lang.Long"/><arg column="syllabus_version_id" javaType="java.lang.Long"/><arg column="exam_subject_id" javaType="java.lang.Long"/>
+            <arg column="source_file_path" javaType="String"/><arg column="source_file_hash" javaType="String"/><arg column="source_file_size" javaType="_long"/>
+            <arg column="import_type" javaType="String"/><arg column="template_version" javaType="String"/><arg column="parse_config" javaType="String"/>
+            <arg column="status" javaType="String"/><arg column="current_stage" javaType="String"/><arg column="progress_percent" javaType="java.math.BigDecimal"/>
+            <arg column="valid_count" javaType="_int"/><arg column="warning_count" javaType="_int"/><arg column="failed_count" javaType="_int"/><arg column="generated_count" javaType="_int"/>
+            <arg column="trace_id" javaType="String"/><arg column="create_time" javaType="java.time.OffsetDateTime"/>
+            <arg column="started_time" javaType="java.time.OffsetDateTime"/><arg column="finished_time" javaType="java.time.OffsetDateTime"/>
+            <arg column="create_by" javaType="java.lang.Long"/><arg column="create_dept" javaType="java.lang.Long"/>
+            <arg column="baseline_hash" javaType="String"/><arg column="resolution_hash" javaType="String"/>
+            <arg column="certification_id" javaType="java.lang.Long"/>
+        </constructor>
+    </resultMap>
+    <resultMap id="paperImportResultMap" type="org.dromara.certmuse.catalog.domain.PaperImportRow">
+        <constructor>
+            <idArg column="import_batch_id" javaType="_long"/><arg column="certification_id" javaType="_long"/>
+            <arg column="collection_name" javaType="String"/><arg column="collection_type" javaType="String"/>
+            <arg column="duration_minutes" javaType="_int"/><arg column="exam_year" javaType="java.lang.Integer"/>
+            <arg column="exam_month" javaType="java.lang.Integer"/><arg column="paper_type_code" javaType="String"/>
+            <arg column="paper_type_name" javaType="String"/><arg column="collection_id" javaType="java.lang.Long"/>
+            <arg column="collection_revision_id" javaType="java.lang.Long"/>
+        </constructor>
+    </resultMap>
+    <resultMap id="paperQuestionReuseResultMap" type="org.dromara.certmuse.catalog.domain.PaperQuestionReuse">
+        <constructor>
+            <arg column="question_id" javaType="_long"/><arg column="revision_id" javaType="_long"/>
+            <arg column="answer_schema" javaType="String"/>
+        </constructor>
+    </resultMap>
+    <resultMap id="idempotencyResultMap" type="org.dromara.certmuse.catalog.domain.CmIdempotencyRecord">
+        <constructor>
+            <arg column="payload_hash" javaType="String"/><arg column="status" javaType="String"/>
+            <arg column="resource_id" javaType="java.lang.Long"/><arg column="response_status" javaType="java.lang.Integer"/>
+            <arg column="response_body" javaType="String"/>
+        </constructor>
+    </resultMap>
+    <resultMap id="asyncJobResultMap" type="org.dromara.certmuse.catalog.domain.CmAsyncJob">
+        <constructor>
+            <idArg column="id" javaType="_long"/><arg column="job_type" javaType="String"/>
+            <arg column="business_key" javaType="String"/><arg column="payload" javaType="String"/>
+            <arg column="attempt_count" javaType="_int"/><arg column="max_attempts" javaType="_int"/>
+        </constructor>
+    </resultMap>
+
+    <resultMap id="issueResultMap" type="org.dromara.certmuse.catalog.domain.vo.ImportIssueVo">
+        <constructor>
+            <arg column="line_no" javaType="_int"/><arg column="source_key" javaType="String"/>
+            <arg column="field_path" javaType="String"/><arg column="severity" javaType="String"/>
+            <arg column="issue_code" javaType="String"/><arg column="message" javaType="String"/>
+            <arg column="create_time" javaType="java.time.OffsetDateTime"/>
+        </constructor>
+    </resultMap>
+    <resultMap id="syllabusOptionResultMap" type="org.dromara.certmuse.catalog.domain.vo.SyllabusVersionOptionVo">
+        <constructor>
+            <arg column="id" javaType="String"/><arg column="certification_id" javaType="String"/><arg column="label" javaType="String"/>
+            <arg column="knowledge_tree_available" javaType="boolean"/><arg column="knowledge_point_count" javaType="long"/>
+        </constructor>
+    </resultMap>
+    <resultMap id="examSubjectOptionResultMap" type="org.dromara.certmuse.catalog.domain.vo.ExamSubjectOptionVo">
+        <constructor>
+            <arg column="id" javaType="String"/><arg column="subject_no" javaType="int"/><arg column="label" javaType="String"/>
+        </constructor>
+    </resultMap>
+    <resultMap id="questionImportOptionResultMap" type="org.dromara.certmuse.catalog.domain.vo.QuestionImportOptionRow">
+        <constructor>
+            <arg column="exam_subject_id" javaType="String"/><arg column="subject_no" javaType="java.lang.Integer"/><arg column="exam_subject_label" javaType="String"/>
+            <arg column="syllabus_version_id" javaType="String"/><arg column="syllabus_version_label" javaType="String"/>
+            <arg column="knowledge_tree_available" javaType="java.lang.Boolean"/><arg column="knowledge_point_count" javaType="java.lang.Long"/>
+        </constructor>
+    </resultMap>
+    <resultMap id="completedBatchResultMap" type="org.dromara.certmuse.catalog.domain.vo.CompletedImportBatchVo">
+        <constructor>
+            <arg column="id" javaType="String"/><arg column="file_name" javaType="String"/>
+            <arg column="import_type" javaType="String"/><arg column="syllabus_version_id" javaType="String"/>
+            <arg column="syllabus_label" javaType="String"/><arg column="uploader_id" javaType="String"/>
+            <arg column="uploader_name" javaType="String"/><arg column="status" javaType="String"/>
+            <arg column="completed_time" javaType="java.time.OffsetDateTime"/>
+        </constructor>
+    </resultMap>
+    <resultMap id="completedBatchDetailResultMap" type="org.dromara.certmuse.catalog.domain.vo.CompletedImportBatchDetailVo">
+        <constructor>
+            <arg column="id" javaType="String"/><arg column="document_id" javaType="String"/><arg column="file_name" javaType="String"/>
+            <arg column="import_type" javaType="String"/><arg column="syllabus_version_id" javaType="String"/>
+            <arg column="syllabus_label" javaType="String"/><arg column="uploader_id" javaType="String"/>
+            <arg column="uploader_name" javaType="String"/><arg column="status" javaType="String"/>
+            <arg column="completed_time" javaType="java.time.OffsetDateTime"/>
+            <arg column="valid_count" javaType="java.lang.Integer"/><arg column="warning_count" javaType="java.lang.Integer"/>
+            <arg column="failed_count" javaType="java.lang.Integer"/><arg column="generated_count" javaType="java.lang.Integer"/>
+        </constructor>
+    </resultMap>
+    <resultMap id="textbookDocumentResultMap" type="org.dromara.certmuse.catalog.domain.TextbookImportDocument">
+        <constructor>
+            <idArg column="id" javaType="_long"/><arg column="syllabus_version_id" javaType="java.lang.Long"/>
+            <arg column="title" javaType="String"/><arg column="edition" javaType="String"/>
+            <arg column="status" javaType="String"/><arg column="del_flag" javaType="String"/>
+            <arg column="create_by" javaType="java.lang.Long"/><arg column="create_dept" javaType="java.lang.Long"/>
+            <arg column="certification_id" javaType="_long"/>
+        </constructor>
+    </resultMap>
+    <resultMap id="textbookKnowledgeLookupResultMap" type="org.dromara.certmuse.catalog.domain.TextbookKnowledgePointLookup">
+        <constructor>
+            <idArg column="id" javaType="_long"/><arg column="syllabus_version_id" javaType="_long"/>
+            <arg column="exam_subject_id" javaType="_long"/><arg column="syllabus_number" javaType="String"/>
+        </constructor>
+    </resultMap>
+    <resultMap id="textbookPreviewKnowledgePointLookupResultMap" type="org.dromara.certmuse.catalog.domain.TextbookPreviewKnowledgePointLookup">
+        <constructor>
+            <arg column="exam_subject_id" javaType="_long"/><arg column="syllabus_number" javaType="String"/>
+            <arg column="syllabus_title" javaType="String"/>
+        </constructor>
+    </resultMap>
+    <resultMap id="textbookPreviewRecordResultMap" type="org.dromara.certmuse.catalog.domain.TextbookPreviewRecord">
+        <constructor>
+            <arg column="line_no" javaType="_int"/><arg column="source_key" javaType="String"/>
+            <arg column="raw_record" javaType="String"/><arg column="issue_count" javaType="_int"/>
+        </constructor>
+    </resultMap>
+    <resultMap id="replaceableTextbookDraftResultMap" type="org.dromara.certmuse.catalog.domain.vo.ReplaceableTextbookDraftVo">
+        <constructor>
+            <arg column="id" javaType="String"/><arg column="title" javaType="String"/>
+            <arg column="edition" javaType="String"/><arg column="syllabus_version_id" javaType="String"/>
+        </constructor>
+    </resultMap>
+    <resultMap id="textbookPreviewDocumentResultMap" type="org.dromara.certmuse.catalog.domain.vo.TextbookImportPreviewDocumentVo">
+        <constructor>
+            <arg column="id" javaType="String"/><arg column="title" javaType="String"/>
+            <arg column="edition" javaType="String"/><arg column="syllabus_version_name" javaType="String"/>
+        </constructor>
+    </resultMap>
+    <resultMap id="textbookPreviewSummaryResultMap" type="org.dromara.certmuse.catalog.domain.vo.TextbookImportPreviewSummaryVo">
+        <constructor>
+            <arg column="total_chunks" javaType="_long"/><arg column="valid_chunks" javaType="_long"/>
+            <arg column="mapped_chunks" javaType="_long"/><arg column="unmapped_chunks" javaType="_long"/>
+            <arg column="knowledge_relation_count" javaType="_long"/><arg column="image_count" javaType="_long"/>
+            <arg column="error_count" javaType="_long"/><arg column="warning_count" javaType="_long"/>
+        </constructor>
+    </resultMap>
+    <resultMap id="textbookImportRecordDataResultMap" type="org.dromara.certmuse.catalog.domain.TextbookImportRecordData">
+        <constructor>
+            <idArg column="id" javaType="_long"/><arg column="raw_record" javaType="String"/>
+        </constructor>
+    </resultMap>
+    <resultMap id="completedTypeCountsResultMap" type="org.dromara.certmuse.catalog.domain.vo.ImportBatchTypeCountsVo">
+        <constructor>
+            <arg column="all_count" javaType="java.lang.Long"/><arg column="knowledge_point_count" javaType="java.lang.Long"/>
+            <arg column="question_count" javaType="java.lang.Long"/><arg column="textbook_count" javaType="java.lang.Long"/>
+        </constructor>
+    </resultMap>
+    <resultMap id="completedSyllabusOptionResultMap" type="org.dromara.certmuse.catalog.domain.vo.ImportBatchSyllabusOptionVo">
+        <constructor>
+            <arg column="id" javaType="String"/><arg column="label" javaType="String"/>
+        </constructor>
+    </resultMap>
+    <resultMap id="completedUploaderOptionResultMap" type="org.dromara.certmuse.catalog.domain.vo.ImportBatchUploaderOptionVo">
+        <constructor>
+            <arg column="id" javaType="String"/><arg column="name" javaType="String"/>
+        </constructor>
+    </resultMap>
+    <resultMap id="knowledgeImportPointResultMap" type="org.dromara.certmuse.catalog.domain.KnowledgeImportPointRow">
+        <id property="knowledgePointId" column="knowledge_point_id"/>
+        <result property="importRecordId" column="import_record_id"/>
+        <result property="examSubjectId" column="exam_subject_id"/>
+        <result property="parentKnowledgePointId" column="parent_knowledge_point_id"/>
+        <result property="parentSyllabusNumber" column="parent_syllabus_number"/>
+        <result property="parentSyllabusTitle" column="parent_syllabus_title"/>
+        <result property="syllabusNumber" column="syllabus_number"/>
+        <result property="syllabusTitle" column="syllabus_title"/>
+        <result property="treeDepth" column="tree_depth"/>
+        <result property="sortOrder" column="sort_order"/>
+        <result property="description" column="description"/>
+        <result property="importance" column="importance"/>
+        <result property="status" column="knowledge_status"/>
+        <result property="rowVersion" column="row_version"/>
+    </resultMap>
+    <resultMap id="knowledgeImportDiffResultMap" type="org.dromara.certmuse.catalog.domain.KnowledgeImportDiffRow">
+        <id property="id" column="id"/>
+        <result property="importBatchId" column="import_batch_id"/>
+        <result property="importRecordId" column="import_record_id"/>
+        <result property="oldKnowledgePointId" column="old_knowledge_point_id"/>
+        <result property="suggestedKnowledgePointId" column="suggested_knowledge_point_id"/>
+        <result property="confirmedKnowledgePointId" column="confirmed_knowledge_point_id"/>
+        <result property="examSubjectId" column="exam_subject_id"/>
+        <result property="subjectName" column="subject_name"/>
+        <result property="action" column="action"/>
+        <result property="resolutionStatus" column="resolution_status"/>
+        <result property="resolutionDecision" column="resolution_decision"/>
+        <result property="parentDiffId" column="parent_diff_id"/>
+        <result property="matchScore" column="match_score"/>
+        <result property="matchEvidence" column="match_evidence"/>
+        <result property="changedFields" column="changed_fields"/>
+        <result property="oldNumber" column="old_number"/>
+        <result property="oldTitle" column="old_title"/>
+        <result property="newNumber" column="new_number"/>
+        <result property="newTitle" column="new_title"/>
+        <result property="suggestedNumber" column="suggested_number"/>
+        <result property="suggestedTitle" column="suggested_title"/>
+        <result property="confirmedNumber" column="confirmed_number"/>
+        <result property="confirmedTitle" column="confirmed_title"/>
+    </resultMap>
+
+    <sql id="completedBatchBaseWhere">
+        where b.status = 'completed'
+          and b.import_type in ('knowledge_point', 'question', 'document_chunk')
+        <if test="visibleUserId != null">and b.create_by = #{visibleUserId}</if>
+    </sql>
+    <sql id="completedBatchFilteredWhere">
+        <include refid="completedBatchBaseWhere"/>
+        <if test="keyword != null">
+            and (
+                b.source_file_name ilike concat('%', #{keyword}, '%')
+                or (#{keyword} ~ '^[0-9]+$' and cast(b.id as varchar) like concat('%', #{keyword}, '%'))
+            )
+        </if>
+        <if test="importType != null">
+            <choose>
+                <when test="importType == 'textbook'">and b.import_type = 'document_chunk'</when>
+                <otherwise>and b.import_type = #{importType}</otherwise>
+            </choose>
+        </if>
+        <if test="syllabusVersionId != null">and coalesce(b.syllabus_version_id, d.syllabus_version_id) = #{syllabusVersionId}</if>
+        <if test="uploaderId != null">and b.create_by = #{uploaderId}</if>
+        <if test="completedStartTime != null">and b.finished_time &gt;= #{completedStartTime}</if>
+        <if test="completedEndTime != null">and b.finished_time &lt; #{completedEndTime}</if>
+    </sql>
+    <sql id="completedBatchSelectColumns">
+        cast(b.id as varchar) as id,
+        b.source_file_name as file_name,
+        case when b.import_type = 'document_chunk' then 'textbook' else b.import_type end as import_type,
+        cast(coalesce(b.syllabus_version_id, d.syllabus_version_id) as varchar) as syllabus_version_id,
+        case when sv.id is null then null else concat(ec.certification_name, ' · ', sv.version_name) end as syllabus_label,
+        cast(b.create_by as varchar) as uploader_id,
+        coalesce(nullif(u.nick_name, ''), nullif(u.user_name, ''), '已删除用户') as uploader_name,
+        b.status,
+        b.finished_time as completed_time
+    </sql>
+    <sql id="completedBatchJoins">
+        left join cm_document d on d.id = b.document_id and b.import_type = 'document_chunk'
+        left join cm_syllabus_version sv on sv.id = coalesce(b.syllabus_version_id, d.syllabus_version_id)
+        left join cm_exam_certification ec on ec.id = sv.certification_id
+    </sql>
+
+    <select id="countCompletedBatches" resultType="long">
+        select count(*)
+        from cm_import_batch b
+        left join cm_document d on d.id = b.document_id and b.import_type = 'document_chunk'
+        <include refid="completedBatchFilteredWhere"/>
+    </select>
+    <select id="selectCompletedBatches" resultMap="completedBatchResultMap">
+        select <include refid="completedBatchSelectColumns"/>
+        from cm_import_batch b
+        <include refid="completedBatchJoins"/>
+        left join sys_user u on u.user_id = b.create_by
+        <include refid="completedBatchFilteredWhere"/>
+        order by b.finished_time <choose><when test="ascending">asc</when><otherwise>desc</otherwise></choose>,
+                 b.id <choose><when test="ascending">asc</when><otherwise>desc</otherwise></choose>
+        limit #{limit} offset #{offset}
+    </select>
+    <select id="selectCompletedTypeCounts" resultMap="completedTypeCountsResultMap">
+        select count(*) as all_count,
+               count(*) filter (where b.import_type = 'knowledge_point') as knowledge_point_count,
+               count(*) filter (where b.import_type = 'question') as question_count,
+               count(*) filter (where b.import_type = 'document_chunk') as textbook_count
+        from cm_import_batch b
+        <include refid="completedBatchBaseWhere"/>
+    </select>
+    <select id="selectCompletedSyllabusOptions" resultMap="completedSyllabusOptionResultMap">
+        select distinct cast(sv.id as varchar) as id,
+               concat(ec.certification_name, ' · ', sv.version_name) as label
+        from cm_import_batch b
+        left join cm_document d on d.id = b.document_id and b.import_type = 'document_chunk'
+        join cm_syllabus_version sv on sv.id = coalesce(b.syllabus_version_id, d.syllabus_version_id)
+        join cm_exam_certification ec on ec.id = sv.certification_id
+        <include refid="completedBatchBaseWhere"/>
+        order by label, id
+    </select>
+    <select id="selectCompletedUploaderOptions" resultMap="completedUploaderOptionResultMap">
+        select distinct cast(b.create_by as varchar) as id,
+               coalesce(nullif(u.nick_name, ''), nullif(u.user_name, ''), '已删除用户') as name
+        from cm_import_batch b
+        left join sys_user u on u.user_id = b.create_by
+        <include refid="completedBatchBaseWhere"/>
+        and b.create_by is not null
+        order by name, id
+    </select>
+    <select id="selectCompletedBatchDetail" resultMap="completedBatchDetailResultMap">
+        select <include refid="completedBatchSelectColumns"/>, cast(b.document_id as varchar) as document_id,
+               b.valid_count,
+               b.warning_count,
+               b.failed_count,
+               b.generated_count
+        from cm_import_batch b
+        <include refid="completedBatchJoins"/>
+        left join sys_user u on u.user_id = b.create_by
+        <include refid="completedBatchBaseWhere"/>
+        and b.id = #{id}
+    </select>
+
+    <select id="selectSyllabusOptions" resultMap="syllabusOptionResultMap">
+        select cast(sv.id as varchar) as id,
+               cast(sv.certification_id as varchar) as certification_id,
+               ec.certification_name as label,
+               count(kp.id) &gt; 0 as knowledge_tree_available,
+               count(kp.id) as knowledge_point_count
+        from cm_syllabus_version sv
+        join cm_exam_certification ec on ec.id = sv.certification_id and ec.status = '0'
+        left join cm_knowledge_point kp on kp.syllabus_version_id = sv.id and kp.del_flag = '0'
+        group by sv.id, ec.certification_name, ec.sort_order, sv.version_name, sv.published_date
+        order by ec.sort_order, sv.published_date desc nulls last, sv.id desc
+    </select>
+    <select id="selectExamSubjectOptions" resultMap="examSubjectOptionResultMap">
+        select cast(es.id as varchar) as id,
+               row_number() over (order by case es.subject_code
+                   when 'COMPREHENSIVE' then 1
+                   when 'CASE_ANALYSIS' then 2
+                   when 'ESSAY' then 3
+                   else 999
+               end, es.id)::int as subject_no,
+               es.subject_name as label
+        from cm_exam_subject es
+        join cm_syllabus_version sv on sv.certification_id = es.certification_id
+        where sv.id = #{syllabusVersionId}
+         order by case es.subject_code
+             when 'COMPREHENSIVE' then 1
+             when 'CASE_ANALYSIS' then 2
+             when 'ESSAY' then 3
+             else 999
+         end, es.id
+    </select>
+    <select id="selectExamSubjectOptionsByCertification" resultMap="examSubjectOptionResultMap">
+        select cast(es.id as varchar) as id,
+               row_number() over (order by case es.subject_code
+                   when 'COMPREHENSIVE' then 1
+                   when 'CASE_ANALYSIS' then 2
+                   when 'ESSAY' then 3
+                   else 999
+               end, es.id)::int as subject_no,
+               es.subject_name as label
+        from cm_exam_subject es
+        where es.certification_id = #{certificationId}
+        order by case es.subject_code
+            when 'COMPREHENSIVE' then 1
+            when 'CASE_ANALYSIS' then 2
+            when 'ESSAY' then 3
+            else 999
+        end, es.id
+    </select>
+    <select id="selectCertificationOptions" resultType="org.dromara.certmuse.catalog.domain.vo.TextbookOptionVo">
+        select cast(id as varchar) id, certification_name label
+        from cm_exam_certification where status='0'
+        order by sort_order, certification_name, id
+    </select>
+    <select id="selectCertificationOptionsWithoutSyllabus" resultType="org.dromara.certmuse.catalog.domain.vo.TextbookOptionVo">
+        select cast(ec.id as varchar) id, ec.certification_name label
+        from cm_exam_certification ec
+        where ec.status='0'
+          and not exists (select 1 from cm_syllabus_version sv where sv.certification_id=ec.id)
+        order by ec.sort_order, ec.certification_name, ec.id
+    </select>
+    <select id="selectSyllabusByCertification" resultType="long">
+        select id from cm_syllabus_version where certification_id=#{certificationId} limit 1
+    </select>
+    <insert id="insertSyllabus">
+        insert into cm_syllabus_version(id, certification_id, version_name, create_by, create_dept, update_by)
+        values(#{id}, #{certificationId}, '考纲', #{userId}, #{deptId}, #{userId})
+    </insert>
+
+    <select id="selectQuestionImportOptions" resultMap="questionImportOptionResultMap">
+        with subjects as (
+            select es.id, es.certification_id, es.subject_name,
+                   row_number() over (partition by es.certification_id order by case es.subject_code
+                       when 'COMPREHENSIVE' then 1
+                       when 'CASE_ANALYSIS' then 2
+                       when 'ESSAY' then 3
+                       else 999
+                   end, es.id)::int as subject_no
+            from cm_exam_subject es
+        )
+        select cast(s.id as varchar) as exam_subject_id, s.subject_no,
+               s.subject_name as exam_subject_label, cast(sv.id as varchar) as syllabus_version_id,
+               concat(ec.certification_name, ' · ', sv.version_name) as syllabus_version_label,
+               count(kp.id) &gt; 0 as knowledge_tree_available, count(kp.id) as knowledge_point_count
+        from subjects s
+        join cm_syllabus_version sv on sv.certification_id=s.certification_id
+        join cm_exam_certification ec on ec.id=sv.certification_id and ec.status='0'
+        left join cm_knowledge_point kp on kp.syllabus_version_id=sv.id and kp.exam_subject_id=s.id and kp.del_flag='0'
+        group by s.id,s.subject_no,s.subject_name,sv.id,ec.certification_name,ec.sort_order,sv.version_name,sv.published_date
+        having count(kp.id) &gt; 0
+        order by ec.sort_order,s.subject_no,sv.published_date desc nulls last,sv.id desc
+    </select>
+
+    <select id="selectSyllabusCertification" resultType="long">select certification_id from cm_syllabus_version where id = #{id}</select>
+    <select id="selectLatestSyllabusForCertification" resultType="long">
+        select sv.id
+        from cm_syllabus_version sv
+        where sv.certification_id=#{certificationId}
+          and exists(select 1 from cm_knowledge_point kp where kp.syllabus_version_id=sv.id and kp.del_flag='0')
+        order by sv.published_date desc nulls last, sv.id desc limit 1
+    </select>
+    <select id="selectSubjectCertification" resultType="long">select certification_id from cm_exam_subject where id = #{id}</select>
+    <select id="selectCertificationNameBySubject" resultType="string">select ec.certification_name from cm_exam_subject es join cm_exam_certification ec on ec.id=es.certification_id where es.id=#{id}</select>
+    <select id="selectCertificationNameBySyllabus" resultType="string">select ec.certification_name from cm_syllabus_version sv join cm_exam_certification ec on ec.id=sv.certification_id where sv.id=#{id}</select>
+    <select id="selectCertificationName" resultType="string">select certification_name from cm_exam_certification where id=#{id}</select>
+    <select id="selectSyllabusDisplayName" resultType="string">
+        select concat(ec.certification_name, ' · ', sv.version_name)
+        from cm_syllabus_version sv join cm_exam_certification ec on ec.id=sv.certification_id
+        where sv.id=#{id}
+    </select>
+    <select id="selectSubjectNo" resultType="int">
+        select subject_no from (
+            select es.id,row_number() over(order by case es.subject_code
+                when 'COMPREHENSIVE' then 1
+                when 'CASE_ANALYSIS' then 2
+                when 'ESSAY' then 3
+                else 999
+            end,es.id)::int as subject_no
+            from cm_exam_subject es join cm_syllabus_version sv on sv.certification_id=es.certification_id
+            where sv.id=#{syllabusVersionId}
+        ) x where id=#{subjectId}
+    </select>
+    <sql id="batchColumns">id,request_id,document_id,syllabus_version_id,exam_subject_id,source_file_path,source_file_hash,source_file_size,import_type,template_version,cast(parse_config as varchar) as parse_config,status,current_stage,progress_percent,valid_count,warning_count,failed_count,generated_count,trace_id,create_time,started_time,finished_time,create_by,create_dept,baseline_hash,resolution_hash,certification_id</sql>
+    <select id="selectByRequestId" resultMap="batchResultMap">select <include refid="batchColumns"/> from cm_import_batch where request_id = #{requestId}</select>
+    <select id="selectIdempotency" resultMap="idempotencyResultMap">
+        select payload_hash, status, resource_id, response_status, cast(response_body as varchar) as response_body
+        from cm_idempotency_record where action_code=#{actionCode} and request_id=#{requestId}
+    </select>
+    <select id="selectVisible" resultMap="batchResultMap">
+        select <include refid="batchColumns"/> from cm_import_batch where id = #{id}
+        <if test="userId != null">and create_by = #{userId}</if>
+    </select>
+    <select id="selectById" resultMap="batchResultMap">select <include refid="batchColumns"/> from cm_import_batch where id = #{id}</select>
+    <select id="selectByIdForUpdate" resultMap="batchResultMap">select <include refid="batchColumns"/> from cm_import_batch where id = #{id} for update</select>
+
+    <select id="selectTextbookDocument" resultMap="textbookDocumentResultMap">
+        select id, syllabus_version_id, title, edition, status, del_flag, create_by, create_dept, certification_id
+        from cm_document
+        where id = #{id} and document_type = 'textbook' and del_flag = '0'
+        <if test="visibleUserId != null">and create_by = #{visibleUserId}</if>
+    </select>
+    <select id="selectTextbookDocumentForUpdate" resultMap="textbookDocumentResultMap">
+        select id, syllabus_version_id, title, edition, status, del_flag, create_by, create_dept, certification_id
+        from cm_document where id = #{id} and document_type = 'textbook' for update
+    </select>
+    <select id="selectReplaceableTextbookDrafts" resultMap="replaceableTextbookDraftResultMap">
+        select cast(id as varchar) as id, title, edition, cast(syllabus_version_id as varchar) as syllabus_version_id
+        from cm_document
+        where syllabus_version_id = #{syllabusVersionId} and document_type = 'textbook'
+          and status = 'draft' and del_flag = '0'
+        <if test="visibleUserId != null">and create_by = #{visibleUserId}</if>
+        order by update_time desc, id desc
+    </select>
+    <select id="selectTextbookKnowledgePointLookups" resultMap="textbookKnowledgeLookupResultMap">
+        select id, syllabus_version_id, exam_subject_id, syllabus_number
+        from cm_knowledge_point
+        where del_flag = '0' and exam_subject_id in
+        <foreach collection="examSubjectIds" item="subjectId" open="(" separator="," close=")">#{subjectId}</foreach>
+    </select>
+    <select id="selectTextbookPreviewKnowledgePointLookups" resultMap="textbookPreviewKnowledgePointLookupResultMap">
+        select kp.exam_subject_id, kp.syllabus_number, kp.syllabus_title
+        from cm_knowledge_point kp
+        join cm_import_batch b on b.id = #{batchId}
+        left join cm_document d on d.id = b.document_id
+        where kp.syllabus_version_id = coalesce(b.syllabus_version_id, d.syllabus_version_id)
+          and kp.del_flag = '0'
+          and kp.exam_subject_id in
+        <foreach collection="examSubjectIds" item="subjectId" open="(" separator="," close=")">#{subjectId}</foreach>
+          and kp.syllabus_number in
+        <foreach collection="syllabusNumbers" item="number" open="(" separator="," close=")">#{number}</foreach>
+    </select>
+
+    <insert id="insertBatch">
+        insert into cm_import_batch(id, request_id, syllabus_version_id, source_file_path, source_file_hash, source_file_name,
+            source_file_size, source_file_mime, import_type, template_version, parser_version, parse_config, status, generated_count, create_by, create_dept, create_time)
+        values (#{id}, #{requestId}, #{syllabusId}, #{sourceFilePath}, #{sourceFileHash}, #{sourceFileName}, #{sourceFileSize}, #{sourceFileMime},
+            'knowledge_point', 'knowledge_point/1.0', 'knowledge-point-precheck/1.0', cast(#{parseConfig} as jsonb), 'uploaded', 0, #{userId}, #{deptId}, #{createTime})
+    </insert>
+    <insert id="insertQuestionBatch">
+        insert into cm_import_batch(id,request_id,certification_id,syllabus_version_id,source_file_path,source_file_hash,source_file_name,
+            source_file_size,source_file_mime,import_type,template_version,parser_version,parse_config,status,generated_count,create_by,create_dept,create_time)
+        values(#{id},#{requestId},#{certificationId},#{syllabusId},#{sourceFilePath},#{sourceFileHash},#{sourceFileName},#{sourceFileSize},#{sourceFileMime},
+            'question','question-zip/1.0','question-zip-precheck/1.0',cast(#{parseConfig} as jsonb),'uploaded',0,#{userId},#{deptId},#{createTime})
+    </insert>
+    <insert id="insertPaperBatch">
+        insert into cm_import_batch(id,request_id,certification_id,syllabus_version_id,source_file_path,source_file_hash,source_file_name,source_file_size,source_file_mime,import_type,template_version,parse_config,status,current_stage,progress_percent,create_by,create_dept,create_time)
+        values(#{id},#{requestId},#{certificationId},#{syllabusId},#{sourceFilePath},#{sourceFileHash},#{sourceFileName},#{sourceFileSize},#{sourceFileMime},'paper','question-zip/1.0',cast(#{parseConfig} as jsonb),'uploaded','uploaded',0,#{userId},#{deptId},#{createTime})
+    </insert>
+    <insert id="insertPaperImport">
+        insert into cm_paper_import(import_batch_id,certification_id,collection_name,collection_type,duration_minutes,
+            exam_year,exam_month,paper_type_code,paper_type_name)
+        values(#{batchId},#{certificationId},#{collectionName},#{collectionType},#{durationMinutes},
+            #{examYear},#{examMonth},#{paperTypeCode},#{paperTypeName})
+    </insert>
+    <select id="selectPaperImport" resultMap="paperImportResultMap">
+        select import_batch_id,certification_id,collection_name,collection_type,duration_minutes,
+               exam_year,exam_month,paper_type_code,paper_type_name,collection_id,collection_revision_id
+        from cm_paper_import where import_batch_id=#{batchId}
+    </select>
+    <select id="selectPaperImportForUpdate" resultMap="paperImportResultMap">
+        select import_batch_id,certification_id,collection_name,collection_type,duration_minutes,
+               exam_year,exam_month,paper_type_code,paper_type_name,collection_id,collection_revision_id
+        from cm_paper_import where import_batch_id=#{batchId} for update
+    </select>
+    <insert id="insertTextbookDocument">
+        insert into cm_document(
+            id, certification_id, syllabus_version_id, title, document_type, edition, status, del_flag,
+            create_by, create_dept, update_by, create_time, update_time
+        ) values (
+            #{id}, #{certificationId}, #{syllabusVersionId}, #{title}, 'textbook', #{edition}, 'draft', '0',
+            #{userId}, #{deptId}, #{userId}, #{createTime}, #{createTime}
+        )
+    </insert>
+    <insert id="insertTextbookBatch">
+        insert into cm_import_batch(
+            id, request_id, document_id, certification_id, syllabus_version_id, source_file_path, source_file_hash, source_file_name,
+            source_file_size, source_file_mime, import_type, template_version, parser_version,
+            parse_config, status, generated_count, create_by, create_dept, create_time
+        ) values (
+            #{id}, #{requestId}, #{documentId}, #{certificationId}, #{syllabusVersionId}, #{sourceFilePath}, #{sourceFileHash}, #{sourceFileName},
+            #{sourceFileSize}, #{sourceFileMime}, 'document_chunk', 'document_chunk/1.0',
+            'document-chunk-precheck/1.0', cast(#{parseConfig} as jsonb), 'uploaded', 0,
+            #{userId}, #{deptId}, #{createTime}
+        )
+    </insert>
+    <update id="bindTextbookSyllabus">
+        update cm_document set syllabus_version_id=#{syllabusVersionId}, update_by=#{userId}, update_time=now()
+        where id=#{id} and syllabus_version_id is null and document_type='textbook' and del_flag='0'
+    </update>
+    <update id="bindTextbookDocument">
+        update cm_import_batch set document_id=#{documentId}, update_time=now()
+        where id=#{id} and import_type='document_chunk' and document_id is null
+    </update>
+    <update id="submitTextbookForAutoPublish">
+        update cm_document set status='pending_review', submitted_by=#{userId}, submitted_time=#{confirmedTime},
+            update_by=#{userId}, update_time=now()
+        where id=#{id} and document_type='textbook' and del_flag='0' and status='draft'
+    </update>
+    <update id="approveTextbookAfterImport">
+        update cm_document set status='approved', reviewed_by=submitted_by, reviewed_time=now(), review_comment=null,
+            update_by=coalesce(submitted_by, update_by), update_time=now()
+        where id=#{id} and document_type='textbook' and del_flag='0' and status='pending_review'
+    </update>
+    <update id="publishTextbookAfterImport">
+        update cm_document set status='published', published_by=reviewed_by, published_time=now(),
+            update_by=coalesce(reviewed_by, update_by), update_time=now()
+        where id=#{id} and document_type='textbook' and del_flag='0' and status='approved'
+    </update>
+    <insert id="insertIdempotency">
+        insert into cm_idempotency_record(id,action_code,request_id,payload_hash,status,expires_time)
+        values(#{id},#{actionCode},#{requestId},#{payloadHash},'processing',now()+interval '7 days')
+    </insert>
+    <update id="completeIdempotency">
+        update cm_idempotency_record set status='succeeded',resource_type='cm_import_batch',resource_id=#{resourceId},
+            response_status=200,response_body=cast(#{responseBody} as jsonb),update_time=now()
+        where action_code=#{actionCode} and request_id=#{requestId} and status='processing'
+    </update>
+    <update id="start">
+        update cm_import_batch set status = 'parsing', current_stage = 'read_jsonl', started_time = coalesce(started_time, now()), update_time = now()
+        where id = #{id} and status = 'uploaded'
+    </update>
+    <update id="acceptConfirmation">
+        update cm_import_batch b
+        set status='importing', current_stage='persist_knowledge_tree', progress_percent=0,
+            confirmed_by=#{userId}, confirmed_time=#{confirmedTime}, finished_time=null,
+            trace_id=null, error_summary=null, update_time=now()
+        where b.id=#{id} and b.status='waiting_confirm' and b.valid_count &gt; 0
+          and b.failed_count=0 and b.baseline_hash is not null and b.resolution_hash is not null
+          and not exists (
+              select 1 from cm_knowledge_import_diff d
+              where d.import_batch_id=b.id and d.resolution_status='pending'
+          )
+    </update>
+    <select id="countKnowledgePoints" resultType="long">
+        select count(*) from cm_knowledge_point
+        where syllabus_version_id=#{syllabusVersionId} and del_flag = '0'
+    </select>
+    <select id="selectCurrentKnowledgePoints" resultMap="knowledgeImportPointResultMap">
+        select kp.id as knowledge_point_id, null::bigint as import_record_id, kp.exam_subject_id,
+               kp.parent_id as parent_knowledge_point_id, parent.syllabus_number as parent_syllabus_number,
+               parent.syllabus_title as parent_syllabus_title, kp.syllabus_number, kp.syllabus_title,
+               kp.tree_depth, kp.sort_order, kp.description, kp.importance, kp.status as knowledge_status, kp.row_version
+        from cm_knowledge_point kp
+        left join cm_knowledge_point parent on parent.id=kp.parent_id
+        where kp.syllabus_version_id=#{syllabusVersionId} and kp.del_flag='0'
+        order by kp.exam_subject_id,kp.tree_depth,kp.sort_order,kp.id
+    </select>
+    <select id="selectCurrentKnowledgePoint" resultMap="knowledgeImportPointResultMap">
+        select kp.id as knowledge_point_id, null::bigint as import_record_id, kp.exam_subject_id,
+               kp.parent_id as parent_knowledge_point_id, parent.syllabus_number as parent_syllabus_number,
+               parent.syllabus_title as parent_syllabus_title, kp.syllabus_number, kp.syllabus_title,
+               kp.tree_depth, kp.sort_order, kp.description, kp.importance, kp.status as knowledge_status, kp.row_version
+        from cm_knowledge_point kp
+        left join cm_knowledge_point parent on parent.id=kp.parent_id
+        where kp.syllabus_version_id=#{syllabusVersionId} and kp.id=#{knowledgePointId} and kp.del_flag='0'
+    </select>
+    <select id="selectImportedKnowledgePoints" resultMap="knowledgeImportPointResultMap">
+        with incoming as (
+            select r.id as import_record_id,
+                   mapping.exam_subject_id,
+                   r.raw_record-&gt;'payload'-&gt;&gt;'parent_syllabus_number' as parent_syllabus_number,
+                   r.raw_record-&gt;'payload'-&gt;&gt;'syllabus_number' as syllabus_number,
+                   r.raw_record-&gt;'payload'-&gt;&gt;'syllabus_title' as syllabus_title,
+                   (r.raw_record-&gt;'payload'-&gt;&gt;'tree_depth')::int as tree_depth,
+                   (r.raw_record-&gt;'payload'-&gt;&gt;'sort_order')::int as sort_order,
+                   r.raw_record-&gt;'payload'-&gt;&gt;'description' as description,
+                   nullif(r.raw_record-&gt;'payload'-&gt;&gt;'importance','')::int as importance,
+                   r.raw_record-&gt;'payload'-&gt;&gt;'status' as knowledge_status
+            from cm_import_record r
+            join cm_import_batch b on b.id=r.batch_id
+            join lateral (
+                select (item-&gt;&gt;'exam_subject_id')::bigint as exam_subject_id
+                from jsonb_array_elements(b.parse_config-&gt;'subject_mappings') item
+                where (item-&gt;&gt;'subject_no')::int=(r.raw_record-&gt;'payload'-&gt;&gt;'subject_no')::int
+            ) mapping on true
+            where r.batch_id=#{batchId} and r.status='success'
+        )
+        select null::bigint as knowledge_point_id, child.import_record_id, child.exam_subject_id,
+               null::bigint as parent_knowledge_point_id, child.parent_syllabus_number,
+               parent.syllabus_title as parent_syllabus_title, child.syllabus_number, child.syllabus_title,
+               child.tree_depth, child.sort_order, child.description, child.importance, child.knowledge_status, 0::bigint as row_version
+        from incoming child
+        left join incoming parent on parent.exam_subject_id=child.exam_subject_id
+            and parent.syllabus_number=child.parent_syllabus_number
+        order by child.exam_subject_id,child.tree_depth,child.sort_order,child.import_record_id
+    </select>
+    <delete id="deleteKnowledgeImportDiffs">delete from cm_knowledge_import_diff where import_batch_id=#{batchId}</delete>
+    <insert id="insertKnowledgeImportDiffs">
+        insert into cm_knowledge_import_diff(
+            id,import_batch_id,import_record_id,old_knowledge_point_id,suggested_knowledge_point_id,
+            confirmed_knowledge_point_id,exam_subject_id,action,resolution_status,match_score,
+            match_evidence,changed_fields,create_by,update_by
+        ) values
+        <foreach collection="rows" item="row" separator=",">
+            (#{row.id},#{row.importBatchId},#{row.importRecordId},#{row.oldKnowledgePointId},
+             #{row.suggestedKnowledgePointId},#{row.confirmedKnowledgePointId},#{row.examSubjectId},
+             #{row.action},#{row.resolutionStatus},#{row.matchScore},cast(#{row.matchEvidence} as jsonb),
+             cast(#{row.changedFields} as jsonb),#{row.userId},#{row.userId})
+        </foreach>
+    </insert>
+    <update id="updateKnowledgeImportHashes">
+        update cm_import_batch set baseline_hash=#{baselineHash},resolution_hash=#{resolutionHash},update_time=now()
+        where id=#{batchId} and import_type='knowledge_point' and status='validating'
+    </update>
+    <sql id="knowledgeDiffWhere">
+        where d.import_batch_id=#{batchId}
+        <if test="examSubjectId != null">and d.exam_subject_id=#{examSubjectId}</if>
+        <if test="resolutionStatus != null">and d.resolution_status=#{resolutionStatus}</if>
+        <if test="action != null">and d.action=#{action}</if>
+        <if test="excludeUnchanged">and d.action &lt;&gt; 'unchanged'</if>
+        <if test="minScore != null">and d.match_score&gt;=#{minScore}</if>
+        <if test="maxScore != null">and d.match_score&lt;=#{maxScore}</if>
+    </sql>
+    <select id="countKnowledgeImportDiffs" resultType="long">
+        select count(*) from cm_knowledge_import_diff d <include refid="knowledgeDiffWhere"/>
+    </select>
+    <sql id="knowledgeDiffSelect">
+        select d.id,d.import_batch_id,d.import_record_id,d.old_knowledge_point_id,
+               d.suggested_knowledge_point_id,d.confirmed_knowledge_point_id,d.exam_subject_id,
+               es.subject_name,d.action,d.resolution_status,d.resolution_decision,
+               (select parent_diff.id from cm_knowledge_import_diff parent_diff
+                    join cm_import_record parent_record on parent_record.id=parent_diff.import_record_id
+                  where parent_diff.import_batch_id=d.import_batch_id and parent_diff.exam_subject_id=d.exam_subject_id
+                    and parent_record.raw_record-&gt;'payload'-&gt;&gt;'syllabus_number'=record.raw_record-&gt;'payload'-&gt;&gt;'parent_syllabus_number'
+                  limit 1) as parent_diff_id,d.match_score,
+               cast(d.match_evidence as varchar) as match_evidence,
+               cast(d.changed_fields as varchar) as changed_fields,
+               old.syllabus_number as old_number,old.syllabus_title as old_title,
+               record.raw_record-&gt;'payload'-&gt;&gt;'syllabus_number' as new_number,
+               record.raw_record-&gt;'payload'-&gt;&gt;'syllabus_title' as new_title,
+               suggested.syllabus_number as suggested_number,suggested.syllabus_title as suggested_title,
+               confirmed.syllabus_number as confirmed_number,confirmed.syllabus_title as confirmed_title
+        from cm_knowledge_import_diff d
+        join cm_exam_subject es on es.id=d.exam_subject_id
+        left join cm_import_record record on record.id=d.import_record_id
+        left join cm_knowledge_point old on old.id=d.old_knowledge_point_id
+        left join cm_knowledge_point suggested on suggested.id=d.suggested_knowledge_point_id
+        left join cm_knowledge_point confirmed on confirmed.id=d.confirmed_knowledge_point_id
+    </sql>
+    <select id="selectKnowledgeImportDiffs" resultMap="knowledgeImportDiffResultMap">
+        <include refid="knowledgeDiffSelect"/><include refid="knowledgeDiffWhere"/>
+        order by d.exam_subject_id,d.id limit #{limit} offset #{offset}
+    </select>
+    <select id="selectAllKnowledgeImportDiffs" resultMap="knowledgeImportDiffResultMap">
+        <include refid="knowledgeDiffSelect"/> where d.import_batch_id=#{batchId} order by d.id
+    </select>
+    <select id="selectKnowledgeImportDiffCounts" resultType="org.dromara.certmuse.catalog.domain.KnowledgeImportDiffCounts">
+        select count(*) filter(where d.action='unchanged') as unchanged_count,
+               count(*) filter(where d.action='update') as update_count,
+               count(*) filter(where d.action='move') as move_count,
+               count(*) filter(where d.action='add') as add_count,
+               count(*) filter(where d.action='delete') as delete_count,
+               count(*) filter(where d.resolution_status='pending') as pending_count,
+               (select count(distinct qk.question_id) from cm_question_knowledge qk
+                where qk.knowledge_point_id in (
+                    select old_knowledge_point_id from cm_knowledge_import_diff
+                    where import_batch_id=#{batchId} and action='delete'
+                )) as affected_question_count,
+               (select count(distinct qr.id)
+                from cm_question_revision qr
+                where qr.status='published'
+                  and exists (
+                      select 1 from cm_question_knowledge qk
+                      where qk.question_revision_id=qr.id and qk.knowledge_point_id in (
+                          select old_knowledge_point_id from cm_knowledge_import_diff
+                          where import_batch_id=#{batchId} and action='delete'
+                      )
+                  )
+                  and (
+                      (select count(*) from cm_question_knowledge qk
+                       where qk.question_revision_id=qr.id
+                         and qk.knowledge_point_id not in (
+                             select old_knowledge_point_id from cm_knowledge_import_diff
+                             where import_batch_id=#{batchId} and action='delete'
+                         ))=0
+                      or (select count(*) from cm_question_knowledge qk
+                          where qk.question_revision_id=qr.id and qk.relation_role='primary'
+                            and qk.knowledge_point_id not in (
+                                select old_knowledge_point_id from cm_knowledge_import_diff
+                                where import_batch_id=#{batchId} and action='delete'
+                            ))&lt;&gt;1
+                  )) as offline_question_count
+        from cm_knowledge_import_diff d where d.import_batch_id=#{batchId}
+    </select>
+    <select id="selectKnowledgeImportDiffForUpdate" resultMap="knowledgeImportDiffResultMap">
+        <include refid="knowledgeDiffSelect"/> where d.import_batch_id=#{batchId} and d.id=#{diffId} for update of d
+    </select>
+    <select id="selectPendingDeleteDiffForOldForUpdate" resultMap="knowledgeImportDiffResultMap">
+        <include refid="knowledgeDiffSelect"/>
+        where d.import_batch_id=#{batchId} and d.import_record_id is null
+          and d.old_knowledge_point_id=#{knowledgePointId} and d.action='delete'
+        for update of d
+    </select>
+    <delete id="deletePendingKnowledgeImportDiff">
+        delete from cm_knowledge_import_diff
+        where import_batch_id=#{batchId} and id=#{diffId} and action='delete'
+          and resolution_status&lt;&gt;'not_required'
+    </delete>
+    <select id="countConfirmedKnowledgePointUse" resultType="long">
+        select count(*) from cm_knowledge_import_diff
+        where import_batch_id=#{batchId} and confirmed_knowledge_point_id=#{knowledgePointId}
+          and id&lt;&gt;#{excludeDiffId}
+    </select>
+    <update id="updateKnowledgeImportDiffResolution">
+        update cm_knowledge_import_diff set action=#{action},confirmed_knowledge_point_id=#{confirmedKnowledgePointId},resolution_decision=#{resolutionDecision},
+            resolution_status='manual_confirmed',update_by=#{userId},update_time=now()
+        where import_batch_id=#{batchId} and id=#{diffId} and resolution_status&lt;&gt;'not_required'
+    </update>
+    <update id="cascadeKnowledgeImportDiffResolution">
+        with recursive descendants as (
+            select d.id,d.import_record_id,d.exam_subject_id
+            from cm_knowledge_import_diff d where d.import_batch_id=#{batchId} and d.id=#{rootDiffId}
+            union all
+            select child.id,child.import_record_id,child.exam_subject_id
+            from cm_knowledge_import_diff child
+            join cm_import_record child_record on child_record.id=child.import_record_id
+            join descendants parent on parent.exam_subject_id=child.exam_subject_id
+            join cm_import_record parent_record on parent_record.id=parent.import_record_id
+            where child.import_batch_id=#{batchId}
+              and child_record.raw_record-&gt;'payload'-&gt;&gt;'parent_syllabus_number'=parent_record.raw_record-&gt;'payload'-&gt;&gt;'syllabus_number'
+        )
+        update cm_knowledge_import_diff d set
+            confirmed_knowledge_point_id=case when #{resolutionDecision}='approve' and d.action in ('update','move') then d.old_knowledge_point_id else null end,
+            resolution_decision=#{resolutionDecision},resolution_status='manual_confirmed',update_by=#{userId},update_time=now()
+        from descendants x where d.id=x.id and d.id&lt;&gt;#{rootDiffId} and d.resolution_status&lt;&gt;'not_required'
+    </update>
+    <select id="countPendingKnowledgeImportDiffs" resultType="long">
+        select count(*) from cm_knowledge_import_diff where import_batch_id=#{batchId} and resolution_status='pending'
+    </select>
+    <update id="updateKnowledgeImportResolutionHash">
+        update cm_import_batch set resolution_hash=#{resolutionHash},update_time=now()
+        where id=#{batchId} and import_type='knowledge_point' and status='waiting_confirm'
+    </update>
+    <select id="lockSyllabusVersion" resultType="long">select id from cm_syllabus_version where id=#{syllabusVersionId} for update</select>
+    <update id="softDeleteActiveKnowledgePoints">
+        update cm_knowledge_point set del_flag='1',row_version=row_version+1,update_by=#{userId},update_time=now()
+        where syllabus_version_id=#{syllabusVersionId} and del_flag='0'
+    </update>
+    <update id="updateKnowledgePoints">
+        update cm_knowledge_point kp set
+            parent_id=v.parent_id,syllabus_number=v.syllabus_number,syllabus_title=v.syllabus_title,
+            tree_depth=v.tree_depth,sort_order=v.sort_order,description=v.description,importance=v.importance,
+            recommendation_enabled=true,status=v.status,
+            del_flag='0',update_by=v.user_id,update_time=now()
+        from (values
+        <foreach collection="rows" item="row" separator=",">
+            (#{row.id}::bigint,#{row.parentId}::bigint,#{row.syllabusNumber}::varchar,
+             #{row.syllabusTitle}::varchar,#{row.treeDepth}::smallint,#{row.sortOrder}::integer,
+             #{row.description}::text,#{row.importance}::smallint,#{row.status}::char(1),#{row.userId}::bigint)
+        </foreach>
+        ) as v(id,parent_id,syllabus_number,syllabus_title,tree_depth,sort_order,description,importance,status,user_id)
+        where kp.id=v.id
+    </update>
+    <select id="selectSuccessfulRecordJson" resultType="string">
+        select cast(raw_record as varchar)
+        from cm_import_record
+        where batch_id=#{batchId} and status='success'
+        order by source_line_no, id
+    </select>
+    <insert id="insertKnowledgePoints">
+        insert into cm_knowledge_point(
+            id, syllabus_version_id, exam_subject_id, parent_id, syllabus_number, syllabus_title,
+            tree_depth, sort_order, description, importance, diagnostic_enabled,
+            recommendation_enabled, status, del_flag, create_by, create_dept, update_by
+        ) values
+        <foreach collection="rows" item="row" separator=",">
+            (#{row.id}, #{row.syllabusVersionId}, #{row.examSubjectId}, #{row.parentId},
+             #{row.syllabusNumber}, #{row.syllabusTitle}, #{row.treeDepth}, #{row.sortOrder},
+             #{row.description}, #{row.importance}, false, true, #{row.status}, '0', #{row.createBy}, #{row.createDept}, #{row.createBy})
+        </foreach>
+    </insert>
+    <update id="completeImport">
+        update cm_import_batch
+        set status='completed', current_stage='persist_knowledge_tree', progress_percent=100,
+            generated_count=#{generatedCount}, finished_time=now(), update_time=now()
+        where id=#{id} and status='importing'
+    </update>
+    <insert id="enqueueJob">
+        insert into cm_async_job(id,job_type,business_key,payload,status,max_attempts)
+        values(#{id},#{jobType},#{businessKey},cast(#{payload} as jsonb),'queued',3)
+    </insert>
+    <insert id="enqueueJobAt">
+        insert into cm_async_job(id,job_type,business_key,payload,status,max_attempts,next_run_time)
+        values(#{id},#{jobType},#{businessKey},cast(#{payload} as jsonb),'queued',3,#{nextRunTime})
+    </insert>
+    <select id="claimJob" resultMap="asyncJobResultMap">
+        update cm_async_job set status='running',attempt_count=attempt_count+1,started_time=now(),
+            lease_until=now()+interval '5 minutes',update_time=now()
+        where id=(select id from cm_async_job where job_type=#{jobType} and status='queued' and next_run_time&lt;=now()
+                  order by next_run_time,id for update skip locked limit 1)
+        returning id,job_type,business_key,cast(payload as varchar) as payload,attempt_count,max_attempts
+    </select>
+    <update id="succeedJob">update cm_async_job set status='succeeded',finished_time=now(),lease_until=null,update_time=now() where id=#{id} and status='running'</update>
+    <update id="retryJob">update cm_async_job set status='queued',next_run_time=now()+interval '30 seconds',last_error=#{error},lease_until=null,update_time=now() where id=#{id} and status='running' and attempt_count&lt;max_attempts</update>
+    <update id="failJob">update cm_async_job set status='failed',finished_time=now(),last_error=#{error},lease_until=null,update_time=now() where id=#{id} and status='running' and attempt_count&gt;=max_attempts</update>
+    <update id="recoverExpiredJobs">update cm_async_job set status='queued',next_run_time=now(),lease_until=null,last_error='任务租约过期',update_time=now() where status='running' and lease_until&lt;now() and attempt_count&lt;max_attempts</update>
+    <delete id="clearBatchData">
+        with removed_issues as (delete from cm_import_issue where import_batch_id=#{batchId}),
+        removed_records as (delete from cm_import_record where batch_id=#{batchId})
+        update cm_import_batch set status='parsing',current_stage='read_jsonl',progress_percent=0,
+            valid_count=0,warning_count=0,failed_count=0,generated_count=0,
+            baseline_hash=null,resolution_hash=null,trace_id=null,error_summary=null,finished_time=null,update_time=now()
+        where id=#{batchId} and status in ('parsing','validating')
+    </delete>
+    <update id="updateStage">
+        update cm_import_batch set status = #{status}, current_stage = #{stage}, progress_percent = greatest(progress_percent, #{progress}), update_time = now()
+        where id = #{id} and status = #{expectedStatus}
+    </update>
+    <update id="updateProgress">update cm_import_batch set current_stage=#{stage},progress_percent=greatest(progress_percent,#{progress}),update_time=now() where id=#{id} and status=#{expectedStatus}</update>
+    <insert id="insertRecord">
+        insert into cm_import_record(id, batch_id, source_line_no, source_key, raw_record, raw_hash, status)
+        values (#{id}, #{batchId}, #{lineNo}, #{sourceKey}, cast(#{rawRecord} as jsonb), #{rawHash}, 'pending')
+    </insert>
+    <insert id="insertIssue">
+        insert into cm_import_issue(id, import_batch_id, import_record_id, issue_code, field_path, severity, message, status)
+        values (#{id}, #{batchId}, #{recordId}, #{code}, #{fieldPath}, #{severity}, #{message}, 'open')
+    </insert>
+    <update id="markRecord">update cm_import_record set status = #{status}, processed_time = now() where id = #{id}</update>
+    <update id="finish">
+        update cm_import_batch b set status = 'waiting_confirm', current_stage = 'finalize_counts', progress_percent = 100,
+            valid_count = (select count(*) from cm_import_record r where r.batch_id = b.id and r.status = 'success'),
+            failed_count = (select count(*) from cm_import_record r where r.batch_id = b.id and r.status = 'failed') +
+                (select count(*) from cm_import_issue i where i.import_batch_id = b.id and i.import_record_id is null and i.severity = 'error'),
+            warning_count = (select count(*) from cm_import_issue i where i.import_batch_id = b.id and i.severity = 'warning'),
+            finished_time = now(), update_time = now() where b.id = #{id} and b.status = #{expectedStatus}
+    </update>
+    <update id="finishQuestion">
+        update cm_import_batch b set status=case when
+            (select count(*) from cm_import_record r where r.batch_id=b.id and r.status='success') = 0
+            or (select count(*) from cm_import_issue i where i.import_batch_id=b.id and i.import_record_id is null and i.severity='error') &gt; 0
+             then 'failed' else 'waiting_confirm' end,
+            current_stage='finalize_counts',progress_percent=100,
+            valid_count=(select count(*) from cm_import_record r where r.batch_id=b.id and r.status='success'),
+            failed_count=(select count(*) from cm_import_record r where r.batch_id=b.id and r.status in ('failed','skipped')) +
+                (select count(*) from cm_import_issue i where i.import_batch_id=b.id and i.import_record_id is null and i.severity='error'),
+            warning_count=(select count(*) from cm_import_issue i where i.import_batch_id=b.id and i.severity='warning'),
+            finished_time=now(),update_time=now()
+        where b.id=#{id} and b.status=#{expectedStatus}
+    </update>
+    <update id="finishPaper">
+        update cm_import_batch b set status=case when
+            (select count(*) from cm_import_record r where r.batch_id=b.id and r.status='success')=0
+            or (select count(*) from cm_import_record r where r.batch_id=b.id and r.status&lt;&gt;'success')&gt;0
+            or (select count(*) from cm_import_issue i where i.import_batch_id=b.id and i.severity in ('error','warning'))&gt;0
+            then 'failed' else 'waiting_confirm' end,
+            current_stage='finalize_counts',progress_percent=100,
+            valid_count=(select count(*) from cm_import_record r where r.batch_id=b.id and r.status='success'),
+            failed_count=(select count(*) from cm_import_record r where r.batch_id=b.id and r.status&lt;&gt;'success')+
+                (select count(*) from cm_import_issue i where i.import_batch_id=b.id and i.import_record_id is null and i.severity='error'),
+            warning_count=(select count(*) from cm_import_issue i where i.import_batch_id=b.id and i.severity='warning'),
+            finished_time=now(),update_time=now()
+        where b.id=#{id} and b.status=#{expectedStatus} and b.import_type='paper'
+    </update>
+    <update id="finishTextbook">
+        update cm_import_batch b set
+            status = case when
+                (select count(*) from cm_import_record r where r.batch_id = b.id and r.status = 'failed') &gt; 0
+                or (select count(*) from cm_import_issue i where i.import_batch_id = b.id and i.severity = 'error') &gt; 0
+                or (select count(*) from cm_import_record r where r.batch_id = b.id and r.status = 'pending') = 0
+                then 'failed' else 'waiting_confirm' end,
+            current_stage = 'finalize_counts', progress_percent = 100,
+            valid_count = (select count(*) from cm_import_record r where r.batch_id = b.id and r.status = 'pending'),
+            failed_count = (select count(*) from cm_import_record r where r.batch_id = b.id and r.status = 'failed') +
+                (select count(*) from cm_import_issue i where i.import_batch_id = b.id and i.import_record_id is null and i.severity = 'error'),
+            warning_count = (select count(*) from cm_import_issue i where i.import_batch_id = b.id and i.severity = 'warning'),
+            finished_time = now(), update_time = now()
+        where b.id = #{id} and b.status = #{expectedStatus}
+    </update>
+    <update id="acceptQuestionConfirmation">
+        update cm_import_batch b set status='importing',current_stage='persist_questions',progress_percent=0,
+            valid_count=(select count(*) from cm_import_record r where r.batch_id=b.id and r.status='success'
+                and not exists(select 1 from cm_import_issue i where i.import_record_id=r.id and i.severity='warning')),
+            failed_count=(select count(*) from cm_import_record r where r.batch_id=b.id and (
+                r.status in ('failed','skipped') or (r.status='success' and exists(
+                    select 1 from cm_import_issue i where i.import_record_id=r.id and i.severity='warning'
+                ))
+            )) + (select count(*) from cm_import_issue i where i.import_batch_id=b.id and i.import_record_id is null and i.severity='error'),
+            confirmed_by=#{userId},confirmed_time=#{confirmedTime},finished_time=null,trace_id=null,error_summary=null,update_time=now()
+        where b.id=#{id} and b.status='waiting_confirm' and exists(
+            select 1 from cm_import_record r where r.batch_id=b.id and r.status='success'
+              and not exists(select 1 from cm_import_issue i where i.import_record_id=r.id and i.severity='warning')
+        )
+    </update>
+    <update id="acceptPaperConfirmation">
+        update cm_import_batch set status='importing',current_stage='persist_paper',progress_percent=0,
+            confirmed_by=#{userId},confirmed_time=#{confirmedTime},finished_time=null,trace_id=null,error_summary=null,update_time=now()
+        where id=#{id} and import_type='paper' and status='waiting_confirm'
+          and valid_count&gt;0 and warning_count=0 and failed_count=0
+    </update>
+    <update id="acceptTextbookConfirmation">
+        update cm_import_batch set status = 'importing', current_stage = 'persist_document_chunks',
+            progress_percent = 0, confirmed_by = #{userId}, confirmed_time = #{confirmedTime},
+            finished_time = null, trace_id = null, error_summary = null, update_time = now()
+        where id = #{id} and import_type = 'document_chunk' and status = 'waiting_confirm'
+          and valid_count &gt; 0 and failed_count = 0
+    </update>
+
+    <select id="selectTextbookPreviewDocument" resultMap="textbookPreviewDocumentResultMap">
+        select cast(b.document_id as varchar) as id,
+               coalesce(d.title, b.parse_config-&gt;&gt;'title') as title,
+               coalesce(d.edition, b.parse_config-&gt;&gt;'edition') as edition,
+               case when sv.id is null then null else concat(ec.certification_name, ' · ', sv.version_name) end as syllabus_version_name
+        from cm_import_batch b
+        left join cm_document d on d.id = b.document_id and d.document_type = 'textbook'
+        left join cm_syllabus_version sv on sv.id = coalesce(b.syllabus_version_id, d.syllabus_version_id)
+        join cm_exam_certification ec on ec.id = coalesce(b.certification_id, d.certification_id)
+        where b.id = #{batchId} and b.import_type = 'document_chunk'
+    </select>
+    <select id="selectTextbookPreviewSummary" resultMap="textbookPreviewSummaryResultMap">
+        select count(r.id) as total_chunks,
+               b.valid_count::bigint as valid_chunks,
+               count(r.id) filter (where coalesce(b.syllabus_version_id, d.syllabus_version_id) is not null
+                   and jsonb_array_length(coalesce(r.raw_record #&gt; '{record,knowledge_points}', '[]'::jsonb)) &gt; 0) as mapped_chunks,
+               count(r.id) filter (where coalesce(b.syllabus_version_id, d.syllabus_version_id) is null
+                   or jsonb_array_length(coalesce(r.raw_record #&gt; '{record,knowledge_points}', '[]'::jsonb)) = 0) as unmapped_chunks,
+               coalesce(sum(case when coalesce(b.syllabus_version_id, d.syllabus_version_id) is null then 0
+                   else jsonb_array_length(coalesce(r.raw_record #&gt; '{record,knowledge_points}', '[]'::jsonb)) end), 0)::bigint as knowledge_relation_count,
+               0::bigint as image_count,
+               (select count(*) from cm_import_issue i where i.import_batch_id = b.id and i.severity = 'error') as error_count,
+               (select count(*) from cm_import_issue i where i.import_batch_id = b.id and i.severity = 'warning') as warning_count
+        from cm_import_batch b
+        left join cm_document d on d.id = b.document_id
+        left join cm_import_record r on r.batch_id = b.id
+        where b.id = #{batchId} and b.import_type = 'document_chunk'
+        group by b.id, b.valid_count, d.syllabus_version_id
+    </select>
+    <select id="countTextbookPreviewRecords" resultType="long">
+        select count(*) from cm_import_record where batch_id = #{batchId}
+    </select>
+    <select id="selectTextbookPreviewRecords" resultMap="textbookPreviewRecordResultMap">
+        select r.source_line_no as line_no, r.source_key, cast(r.raw_record as varchar) as raw_record,
+               count(i.id)::int as issue_count
+        from cm_import_record r
+        left join cm_import_issue i on i.import_record_id = r.id
+        where r.batch_id = #{batchId}
+        group by r.id
+        order by r.source_line_no, r.id
+        limit #{limit} offset #{offset}
+    </select>
+    <select id="selectPendingTextbookRecords" resultMap="textbookImportRecordDataResultMap">
+        select id, cast(raw_record as varchar) as raw_record
+        from cm_import_record
+        where batch_id = #{batchId} and status = 'pending'
+        order by source_line_no, id
+    </select>
+    <select id="countDocumentChunks" resultType="long">
+        select count(*) from cm_document_chunk where document_id = #{documentId}
+    </select>
+    <delete id="deleteTextbookImages">
+        delete from cm_document_image where chunk_id in (
+            select id from cm_document_chunk where document_id = #{documentId}
+        )
+    </delete>
+    <delete id="deleteTextbookKnowledgeRelations">
+        delete from cm_chunk_knowledge where chunk_id in (
+            select id from cm_document_chunk where document_id = #{documentId}
+        )
+    </delete>
+    <delete id="deleteTextbookChunks">
+        delete from cm_document_chunk where document_id = #{documentId}
+    </delete>
+    <insert id="insertTextbookChunks">
+        insert into cm_document_chunk(
+            id, document_id, chunk_order, heading, heading_path, content, source_locator,
+            content_hash, create_by, update_by
+        ) values
+        <foreach collection="rows" item="row" separator=",">
+            (#{row.id}, #{row.documentId}, #{row.chunkOrder}, #{row.heading}, cast(#{row.headingPath} as jsonb),
+             #{row.content}, cast(#{row.sourceLocator} as jsonb), #{row.contentHash}, #{row.createBy}, #{row.createBy})
+        </foreach>
+    </insert>
+    <insert id="insertTextbookKnowledgeRelations">
+        insert into cm_chunk_knowledge(id, chunk_id, knowledge_point_id) values
+        <foreach collection="rows" item="row" separator=",">
+            (#{row.id}, #{row.chunkId}, #{row.knowledgePointId})
+        </foreach>
+    </insert>
+    <update id="updateTextbookRecordResults">
+        update cm_import_record r set result_data = cast(v.result_data as jsonb), status = 'success', processed_time = now()
+        from (values
+        <foreach collection="rows" item="row" separator=",">
+            (#{row.id}::bigint, #{row.resultData}::text)
+        </foreach>
+        ) as v(id, result_data)
+        where r.id = v.id and r.status = 'pending'
+    </update>
+    <update id="completeTextbookImport">
+        update cm_import_batch set status = 'completed', current_stage = 'persist_document_chunks',
+            progress_percent = 100, generated_count = #{generatedCount}, finished_time = now(), update_time = now()
+        where id = #{id} and status = 'importing' and import_type = 'document_chunk'
+    </update>
+    <select id="selectSuccessfulQuestionResult" resultType="string">
+        select cast(r.result_data as varchar)
+        from cm_import_record r
+        where r.batch_id=#{batchId} and r.status='success'
+          and not exists(select 1 from cm_import_issue i where i.import_record_id=r.id and i.severity='warning')
+        order by r.source_line_no,r.id
+    </select>
+    <update id="updateRecordResult">update cm_import_record set result_data=cast(#{resultData} as jsonb),status=#{status},processed_time=now() where id=#{id}</update>
+    <update id="updateQuestionRecordResult">update cm_import_record set subject_no=#{subjectNo},exam_subject_id=#{examSubjectId},result_data=cast(#{resultData} as jsonb),status=#{status},processed_time=now() where id=#{id}</update>
+    <select id="findKnowledgePoint" resultType="long">select id from cm_knowledge_point where syllabus_version_id=#{syllabusVersionId} and exam_subject_id=#{examSubjectId} and syllabus_number=#{code} and del_flag='0'</select>
+    <select id="isKnowledgePointLeaf" resultType="boolean">select not exists(select 1 from cm_knowledge_point where parent_id=#{id} and del_flag='0')</select>
+    <select id="countQuestionSource" resultType="int">select count(*) from cm_question where source_identity_hash=#{sourceHash} and del_flag='0'</select>
+    <select id="findQuestionSemanticDuplicate" resultType="string">
+        select q.question_code
+        from cm_question_revision r
+        join cm_question q on q.id=r.question_id and q.del_flag='0'
+        join cm_exam_subject existing_subject on existing_subject.id=q.exam_subject_id
+        join cm_exam_subject incoming_subject on incoming_subject.id=#{examSubjectId}
+        where existing_subject.certification_id=incoming_subject.certification_id
+          and r.semantic_hash=#{semanticHash}
+        order by q.id, r.revision_no desc
+        limit 1
+    </select>
+    <select id="findPaperQuestionReuses" resultMap="paperQuestionReuseResultMap">
+        with candidates as (
+            select q.id question_id,
+                   r.id revision_id,
+                   cast(r.answer as varchar) answer_schema,
+                   row_number() over (
+                       partition by q.id
+                       order by case when r.status='published' then 0 else 1 end, r.revision_no desc
+                   ) revision_rank
+            from cm_question q
+            join cm_question_revision r on r.question_id=q.id and r.status in ('published','draft')
+            where q.del_flag='0' and q.exam_subject_id=#{examSubjectId}
+              and r.semantic_hash=#{semanticHash}
+              and r.answer is not null
+              and exists(select 1 from cm_question_knowledge qk join cm_knowledge_point kp on kp.id=qk.knowledge_point_id
+                         where qk.question_revision_id=r.id and kp.syllabus_version_id=#{syllabusVersionId} and kp.del_flag='0')
+              <if test="visibleUserId != null">and q.create_by=#{visibleUserId}</if>
+        )
+        select question_id,revision_id,answer_schema from candidates where revision_rank=1
+        order by question_id
+    </select>
+    <insert id="insertQuestion">insert into cm_question(id,question_code,exam_subject_id,source_identity_hash,del_flag,create_by,create_dept,update_by) values(#{id},#{questionCode},#{examSubjectId},#{sourceHash},'0',#{userId},#{deptId},#{userId})</insert>
+    <insert id="insertQuestionRevision">insert into cm_question_revision(id,question_id,revision_no,status,question_type,stem,answer,analysis,source_name,source_external_id,source_locator,content_hash,semantic_hash,create_by,update_by) values(#{id},#{questionId},1,'draft',#{questionType},#{stem},cast(#{answer} as jsonb),#{analysis},#{sourceName},#{sourceExternalId},#{sourceLocator},#{contentHash},#{semanticHash},#{userId},#{userId})</insert>
+    <insert id="insertQuestionEvent">insert into cm_question_revision_event(id,question_id,question_revision_id,event_type,to_status,operator_id,request_id) values(#{id},#{questionId},#{revisionId},'created','draft',#{userId},#{requestId})</insert>
+    <insert id="insertQuestionOption">insert into cm_question_option(id,question_revision_id,option_label,option_text,sort_order,create_by,update_by) values(#{id},#{revisionId},#{label},#{text},#{sortOrder},#{userId},#{userId})</insert>
+    <insert id="insertQuestionImage">insert into cm_question_image(id,question_revision_id,image_order,storage_path,alt_text,create_by,update_by) values(#{id},#{revisionId},#{imageOrder},#{storagePath},#{altText},#{userId},#{userId})</insert>
+    <insert id="insertQuestionKnowledge">insert into cm_question_knowledge(id,question_revision_id,question_id,knowledge_point_id,exam_subject_id,relation_role,sort_order) values(#{id},#{revisionId},#{questionId},#{knowledgePointId},#{examSubjectId},#{role},#{sortOrder})</insert>
+    <update id="completeQuestionImport">update cm_import_batch set status='completed',current_stage='persist_questions',progress_percent=100,generated_count=#{generatedCount},finished_time=now(),update_time=now() where id=#{id} and status='importing'</update>
+    <update id="completePaperImport">
+        update cm_import_batch set status='completed',current_stage='persist_paper',progress_percent=100,generated_count=#{generatedCount},finished_time=now(),update_time=now()
+        where id=#{batchId} and status='importing' and import_type='paper';
+    </update>
+    <update id="updatePaperImportResult">
+        update cm_paper_import set collection_id=#{collectionId},collection_revision_id=#{revisionId} where import_batch_id=#{batchId}
+    </update>
+    <select id="countImageReferences" resultType="long">select count(*) from cm_question_image where storage_path=#{storagePath}</select>
+    <update id="failActive">
+        update cm_import_batch set status = 'failed', trace_id = #{traceId}, error_summary = '预检任务执行失败', finished_time = now(), update_time = now()
+        where id = #{id} and status in ('parsing','validating')
+    </update>
+    <update id="failImporting">
+        update cm_import_batch set status='failed', trace_id=#{traceId},
+            error_summary='正式导入任务执行失败', finished_time=now(), update_time=now()
+        where id=#{id} and status='importing'
+    </update>
+
+    <sql id="issueWhere">
+        where i.import_batch_id = #{batchId}
+        <if test="severity != null">and i.severity = #{severity}</if>
+        <if test="issueCode != null">and i.issue_code = #{issueCode}</if>
+    </sql>
+    <select id="countIssues" resultType="long">select count(*) from cm_import_issue i <include refid="issueWhere"/></select>
+    <select id="selectIssues" resultMap="issueResultMap">
+        select coalesce(r.source_line_no, case when i.field_path ~ '^\$line\[[1-9][0-9]*\]$' then substring(i.field_path from '[0-9]+')::int end) as line_no,
+            r.source_key, i.field_path, i.severity, i.issue_code, i.message, i.create_time
+        from cm_import_issue i left join cm_import_record r on r.id = i.import_record_id
+        <include refid="issueWhere"/>
+        order by
+        <choose>
+            <when test="order == 'severity'">case i.severity when 'error' then 0 else 1 end</when>
+            <when test="order == 'issueCode'">i.issue_code</when>
+            <when test="order == 'createTime'">i.create_time</when>
+            <otherwise>coalesce(r.source_line_no, case when i.field_path ~ '^\$line\[[1-9][0-9]*\]$' then substring(i.field_path from '[0-9]+')::int end)</otherwise>
+        </choose>
+        <choose><when test="asc">asc</when><otherwise>desc</otherwise></choose> nulls last,
+        i.id <choose><when test="asc">asc</when><otherwise>desc</otherwise></choose>
+        limit #{limit} offset #{offset}
+    </select>
+</mapper>

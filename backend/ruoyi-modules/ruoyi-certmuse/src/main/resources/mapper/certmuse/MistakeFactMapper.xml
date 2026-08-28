@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.dromara.certmuse.learning.mapper.MistakeFactMapper">
+    <insert id="insert">insert into cm_error_record(id,user_id,goal_id,attempt_id,knowledge_point_id,evidence_group_key)
+        values(#{id},#{userId},#{goalId},#{attemptId},#{knowledgePointId},#{groupKey}) on conflict do nothing</insert>
+</mapper>

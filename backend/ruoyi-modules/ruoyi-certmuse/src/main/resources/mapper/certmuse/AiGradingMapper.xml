@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.dromara.certmuse.assessment.mapper.AiGradingMapper">
+    <select id="selectRubric" resultType="org.dromara.certmuse.assessment.domain.QuestionAiRubricRow">
+        select id, question_revision_id, context_hash, rubric_data, generator_model, generator_prompt_version
+        from cm_question_ai_rubric where question_revision_id=#{questionRevisionId}
+    </select>
+    <insert id="insertRubric">
+        insert into cm_question_ai_rubric(id, question_revision_id, context_hash, rubric_data, generator_model, generator_prompt_version)
+        values(#{id}, #{revisionId}, #{contextHash}, #{rubric}::jsonb, #{model}, #{promptVersion})
+        on conflict(question_revision_id) do nothing
+    </insert>
+    <insert id="insertTask">
+        insert into cm_ai_grading_task(id, task_key, task_type, question_revision_id, session_question_id, attempt_id, payload)
+        values(#{id}, #{taskKey}, #{taskType}, #{revisionId}, #{sessionQuestionId}, #{attemptId}, #{payload}::jsonb)
+        on conflict(task_key) do nothing
+    </insert>
+    <select id="claimTask" resultType="org.dromara.certmuse.assessment.domain.AiGradingTaskRow">
+        with candidate as (
+            select id from cm_ai_grading_task
+            where status='pending' and next_retry_time &lt;= now()
+            order by create_time for update skip locked limit 1
+        )
+        update cm_ai_grading_task t set status='processing', claimed_time=now(), update_time=now()
+        from candidate where t.id=candidate.id
+        returning t.id, t.task_key, t.task_type, t.status, t.question_revision_id, t.session_question_id,
+                  t.attempt_id, t.payload::text, t.result::text, t.error_code, t.retry_count
+    </select>
+    <update id="reclaimExpiredTasks">
+        update cm_ai_grading_task
+        set status=case when retry_count &lt; 2 then 'pending' else 'failed' end,
+            retry_count=case when retry_count &lt; 2 then retry_count+1 else retry_count end,
+            error_code='AI_GRADING_LEASE_EXPIRED',
+            next_retry_time=case when retry_count &lt; 2 then now() + interval '5 seconds' else next_retry_time end,
+            claimed_time=null,
+            completed_time=case when retry_count &lt; 2 then completed_time else now() end,
+            update_time=now()
+        where status='processing'
+          and coalesce(claimed_time, create_time) &lt;= now() - (#{leaseSeconds} * interval '1 second')
+    </update>
+    <select id="selectTask" resultType="org.dromara.certmuse.assessment.domain.AiGradingTaskRow">
+        select id, task_key, task_type, status, question_revision_id, session_question_id, attempt_id,
+               payload::text, result::text, error_code, retry_count
+        from cm_ai_grading_task where task_key=#{taskKey}
+    </select>
+    <update id="succeedTask">
+        update cm_ai_grading_task set status='succeeded', result=#{result}::jsonb, completed_time=now(), update_time=now()
+        where id=#{id} and status='processing'
+    </update>
+    <update id="retryTask">
+        update cm_ai_grading_task set status='pending', retry_count=retry_count+1, error_code=#{errorCode},
+            next_retry_time=now() + interval '5 seconds', update_time=now()
+        where id=#{id} and status='processing' and retry_count &lt; 2
+    </update>
+    <update id="failTask">
+        update cm_ai_grading_task set status='failed', error_code=#{errorCode}, completed_time=now(), update_time=now()
+        where id=#{id} and status='processing'
+    </update>
+</mapper>

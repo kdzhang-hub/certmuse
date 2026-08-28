@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.dromara.certmuse.catalog.mapper.QualificationVersionMapper">
+    <sql id="qualificationFilter">
+        <if test="query.keyword != null">
+            and (ec.certification_name ilike concat('%', #{query.keyword}, '%')
+              or ec.certification_code ilike concat('%', #{query.keyword}, '%')
+              or exists (select 1 from cm_syllabus_version sv where sv.certification_id = ec.id
+                           and sv.version_name ilike concat('%', #{query.keyword}, '%')))
+        </if>
+        <if test="query.qualificationLevel != null">and ec.qualification_level = #{query.qualificationLevel}</if>
+        <if test="query.status != null">and ec.status = #{query.status}</if>
+    </sql>
+    <select id="selectQualifications" resultType="org.dromara.certmuse.catalog.domain.QualificationRow">
+        select ec.id, ec.certification_code, ec.certification_name, ec.qualification_level, ec.status,
+               ec.sort_order, ec.create_time, ec.update_time
+        from cm_exam_certification ec where 1=1 <include refid="qualificationFilter"/>
+        order by ec.sort_order asc, ec.certification_name asc, ec.id asc limit #{limit} offset #{offset}
+    </select>
+    <select id="countQualifications" resultType="long">
+        select count(*) from cm_exam_certification ec where 1=1 <include refid="qualificationFilter"/>
+    </select>
+    <select id="selectVersions" resultType="org.dromara.certmuse.catalog.domain.SyllabusVersionRow">
+        select sv.id, sv.certification_id, sv.version_name, sv.published_date, sv.create_time, sv.update_time
+        from cm_syllabus_version sv where sv.certification_id in
+        <foreach collection="certificationIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+        order by sv.certification_id, sv.published_date desc nulls last, sv.create_time desc, sv.id desc
+    </select>
+    <select id="selectQualificationReferenceCounts" resultType="org.dromara.certmuse.catalog.domain.ReferenceCountRow">
+        select x.id, sum(x.reference_count)::bigint as "referenceCount" from (
+          select id, (select count(*) from cm_exam_subject where certification_id = id) reference_count from cm_exam_certification where id in <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+          union all select id, (select count(*) from cm_user_goal where certification_id = id) from cm_exam_certification where id in <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+          union all select id, (select count(*) from cm_exam_schedule where certification_id = id) from cm_exam_certification where id in <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+          union all select id, (select count(*) from cm_collection where certification_id = id) from cm_exam_certification where id in <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+        ) x group by x.id
+    </select>
+    <select id="selectVersionReferenceCounts" resultType="org.dromara.certmuse.catalog.domain.ReferenceCountRow">
+        select x.id, sum(x.reference_count)::bigint as "referenceCount" from (
+          select id, (select count(*) from cm_knowledge_point where syllabus_version_id = id) reference_count from cm_syllabus_version where id in <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+          union all select id, (select count(*) from cm_knowledge_prerequisite where syllabus_version_id = id) from cm_syllabus_version where id in <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+          union all select id, (select count(*) from cm_document where syllabus_version_id = id) from cm_syllabus_version where id in <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+          union all select id, (select count(*) from cm_import_batch where syllabus_version_id = id) from cm_syllabus_version where id in <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+          union all select id, (select count(*) from cm_user_goal where syllabus_version_id = id) from cm_syllabus_version where id in <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+          union all select id, (select count(*) from cm_collection where syllabus_version_id = id) from cm_syllabus_version where id in <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+        ) x group by x.id
+    </select>
+    <select id="selectQualification" resultType="org.dromara.certmuse.catalog.domain.QualificationRow">select id, certification_code, certification_name, qualification_level, status, sort_order, create_time, update_time from cm_exam_certification where id=#{id}</select>
+    <select id="lockQualification" resultType="org.dromara.certmuse.catalog.domain.QualificationRow">select id, certification_code, certification_name, qualification_level, status, sort_order, create_time, update_time from cm_exam_certification where id=#{id} for update</select>
+    <select id="findQualificationIdByCode" resultType="long">
+        select id from cm_exam_certification
+        where lower(certification_code) = lower(#{code})
+        <if test="excludeId != null">and id &lt;&gt; #{excludeId}</if>
+        limit 1
+    </select>
+    <select id="findQualificationIdByName" resultType="long">
+        select id from cm_exam_certification
+        where lower(certification_name) = lower(#{name})
+        <if test="excludeId != null">and id &lt;&gt; #{excludeId}</if>
+        limit 1
+    </select>
+    <select id="selectVersion" resultType="org.dromara.certmuse.catalog.domain.SyllabusVersionRow">select id, certification_id, version_name, published_date, create_time, update_time from cm_syllabus_version where id=#{id} and certification_id=#{certificationId}</select>
+    <select id="lockVersion" resultType="org.dromara.certmuse.catalog.domain.SyllabusVersionRow">select id, certification_id, version_name, published_date, create_time, update_time from cm_syllabus_version where id=#{id} and certification_id=#{certificationId} for update</select>
+    <insert id="insertQualification">insert into cm_exam_certification(id, certification_code, certification_name, qualification_level, status, sort_order, create_by, create_dept, update_by) values(#{id},#{code},#{name},#{level},#{status},#{sortOrder},#{userId},#{deptId},#{userId})</insert>
+    <insert id="insertExamSubject">insert into cm_exam_subject(id, certification_id, subject_code, subject_name, create_by, update_by) values(#{id},#{certificationId},#{code},#{name},#{userId},#{userId})</insert>
+    <update id="updateQualification">update cm_exam_certification set certification_code=#{code}, certification_name=#{name}, qualification_level=#{level}, status=#{status}, sort_order=#{sortOrder}, update_by=#{userId}, update_time=now() where id=#{id}</update>
+    <select id="setQualificationCascadeDelete" resultType="string">
+        select set_config('certmuse.qualification_cascade_delete', case when #{enabled} then 'on' else 'off' end, true)
+    </select>
+    <delete id="deleteQualification">delete from cm_exam_certification where id=#{id}</delete>
+    <delete id="deleteKnowledgeImportDiffsByQualification">
+        delete from cm_knowledge_import_diff where import_batch_id in (
+            select ib.id from cm_import_batch ib join cm_syllabus_version sv on sv.id=ib.syllabus_version_id
+            where sv.certification_id=#{certificationId}
+        )
+    </delete>
+    <insert id="insertVersion">insert into cm_syllabus_version(id, certification_id, version_name, published_date, create_by, create_dept, update_by) values(#{id},#{certificationId},#{name},#{publishedDate},#{userId},#{deptId},#{userId})</insert>
+    <update id="updateVersion">update cm_syllabus_version set version_name=#{name}, published_date=#{publishedDate}, update_by=#{userId}, update_time=now() where id=#{id} and certification_id=#{certificationId}</update>
+    <delete id="deleteVersion">delete from cm_syllabus_version where id=#{id} and certification_id=#{certificationId}</delete>
+    <delete id="deleteKnowledgeImportDiffsByVersion">
+        delete from cm_knowledge_import_diff where import_batch_id in (
+            select id from cm_import_batch where syllabus_version_id=#{syllabusVersionId}
+        )
+    </delete>
+    <select id="selectSourceObjectKeysByVersion" resultType="string">
+        select distinct object_key from (
+            select source_file_path as object_key from cm_syllabus_version where id=#{syllabusVersionId}
+            union
+            select batch.source_file_path as object_key from cm_import_batch batch
+            left join cm_document document on document.id=batch.document_id
+            where batch.syllabus_version_id=#{syllabusVersionId} or document.syllabus_version_id=#{syllabusVersionId}
+        ) storage_objects where coalesce(trim(object_key), '') &lt;&gt; ''
+    </select>
+    <select id="selectImageObjectKeysByVersion" resultType="string">
+        select distinct image.storage_path from cm_document_image image
+        join cm_document_chunk chunk on chunk.id=image.chunk_id
+        join cm_document document on document.id=chunk.document_id
+        where document.syllabus_version_id=#{syllabusVersionId} and coalesce(trim(image.storage_path), '') &lt;&gt; ''
+    </select>
+    <select id="selectSourceObjectKeysByQualification" resultType="string">
+        select distinct object_key from (
+            select source_file_path as object_key from cm_syllabus_version where certification_id=#{certificationId}
+            union
+            select document.source_file_path as object_key from cm_document document
+            left join cm_syllabus_version document_version on document_version.id=document.syllabus_version_id
+            where document.certification_id=#{certificationId} or document_version.certification_id=#{certificationId}
+            union
+            select batch.source_file_path as object_key from cm_import_batch batch
+            left join cm_syllabus_version version on version.id=batch.syllabus_version_id
+            left join cm_document document on document.id=batch.document_id
+            left join cm_syllabus_version document_version on document_version.id=document.syllabus_version_id
+            where batch.certification_id=#{certificationId}
+               or version.certification_id=#{certificationId}
+               or document.certification_id=#{certificationId}
+               or document_version.certification_id=#{certificationId}
+        ) storage_objects where coalesce(trim(object_key), '') &lt;&gt; ''
+    </select>
+    <select id="selectImageObjectKeysByQualification" resultType="string">
+        select distinct storage_path from (
+            select image.storage_path from cm_document_image image
+            join cm_document_chunk chunk on chunk.id=image.chunk_id
+            join cm_document document on document.id=chunk.document_id
+            left join cm_syllabus_version version on version.id=document.syllabus_version_id
+            where document.certification_id=#{certificationId} or version.certification_id=#{certificationId}
+            union
+            select image.storage_path from cm_question_image image
+            join cm_question_revision revision on revision.id=image.question_revision_id
+            join cm_question question on question.id=revision.question_id
+            join cm_exam_subject subject on subject.id=question.exam_subject_id
+            where subject.certification_id=#{certificationId}
+        ) storage_objects where coalesce(trim(storage_path), '') &lt;&gt; ''
+    </select>
+    <select id="countImageObjectKeyReferences" resultType="long">
+        select
+            (select count(*) from cm_document_image where storage_path=#{objectKey})
+          + (select count(*) from cm_question_image where storage_path=#{objectKey})
+    </select>
+    <select id="selectQualificationBlockers" resultType="org.dromara.certmuse.catalog.domain.ReferenceBlockerRow">
+        select type, label, reference_count as "count" from (values
+          ('USER_GOAL','用户目标',(select count(*) from cm_user_goal where certification_id=#{id})),
+          ('EXAM_SCHEDULE','考试安排',(select count(*) from cm_exam_schedule where certification_id=#{id})),
+          ('COLLECTION','题集',(select count(*) from cm_collection where certification_id=#{id})),
+          ('QUESTION','题目',(select count(*) from cm_question q join cm_exam_subject es on es.id=q.exam_subject_id where es.certification_id=#{id} and q.del_flag='0')),
+          ('KNOWLEDGE_POINT','知识点',(select count(*) from cm_knowledge_point kp join cm_syllabus_version sv on sv.id=kp.syllabus_version_id where sv.certification_id=#{id} and kp.del_flag='0')),
+          ('TEXTBOOK','教材',(select count(*) from cm_document d join cm_syllabus_version sv on sv.id=d.syllabus_version_id where sv.certification_id=#{id} and d.document_type='textbook' and d.del_flag='0'))
+        ) as blockers(type,label,reference_count) where reference_count &gt; 0
+    </select>
+    <select id="selectVersionBlockers" resultType="org.dromara.certmuse.catalog.domain.ReferenceBlockerRow">
+        select type, label, reference_count as "count" from (values
+          ('KNOWLEDGE_POINT','知识点',(select count(*) from cm_knowledge_point where syllabus_version_id=#{id})),
+          ('KNOWLEDGE_PREREQUISITE','知识点前置关系',(select count(*) from cm_knowledge_prerequisite where syllabus_version_id=#{id})),
+          ('TEXTBOOK','教材',(select count(*) from cm_document where syllabus_version_id=#{id})),
+          ('IMPORT_BATCH','导入批次',(select count(*) from cm_import_batch where syllabus_version_id=#{id})),
+          ('USER_GOAL','用户目标',(select count(*) from cm_user_goal where syllabus_version_id=#{id})),
+          ('COLLECTION','题集',(select count(*) from cm_collection where syllabus_version_id=#{id}))
+        ) as blockers(type,label,reference_count) where reference_count &gt; 0
+    </select>
+    <select id="selectVersionDeleteBlockers" resultType="org.dromara.certmuse.catalog.domain.ReferenceBlockerRow">
+        select type,label,reference_count as "count" from (values
+          ('QUESTION','题目',(select count(*) from cm_question_knowledge qk
+              join cm_knowledge_point kp on kp.id=qk.knowledge_point_id
+              where kp.syllabus_version_id=#{id})),
+          ('TEXTBOOK','教材',(select count(*) from cm_document where syllabus_version_id=#{id}))
+        ) as blockers(type,label,reference_count) where reference_count &gt; 0
+    </select>
+    <select id="selectIdempotency" resultType="org.dromara.certmuse.catalog.domain.CmIdempotencyRecord">select payload_hash, status, resource_id, response_status, cast(response_body as text) response_body from cm_idempotency_record where action_code=#{action} and request_id=#{requestId}</select>
+    <insert id="insertIdempotency">insert into cm_idempotency_record(id,action_code,request_id,payload_hash,status,resource_type,resource_id,expires_time) values(#{id},#{action},#{requestId},#{payloadHash},'processing',#{resourceType},#{resourceId},#{expiresTime})</insert>
+    <update id="completeIdempotency">update cm_idempotency_record set status='succeeded',resource_id=#{resourceId},response_status=200,response_body=cast(#{responseBody} as jsonb),update_time=now() where action_code=#{action} and request_id=#{requestId}</update>
+</mapper>

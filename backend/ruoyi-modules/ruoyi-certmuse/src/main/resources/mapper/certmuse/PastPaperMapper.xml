@@ -1,0 +1,246 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.dromara.certmuse.assessment.mapper.PastPaperMapper">
+    <sql id="currentPaper">
+        from cm_collection c
+        join cm_collection_current cur on cur.collection_id=c.id
+        join cm_collection_revision r on r.id=cur.collection_revision_id
+        join cm_exam_certification cert on cert.id=c.certification_id and cert.status='0'
+        where c.status='0' and c.collection_type='PAST_PAPER'
+          and r.status='published' and r.collection_type='PAST_PAPER'
+    </sql>
+    <sql id="paperColumns">
+        c.id collection_id,r.id revision_id,c.certification_id,r.collection_name,cert.certification_name,r.question_count,
+        r.total_report_score::text total_report_score,r.duration_minutes,c.exam_year,c.exam_month,
+        c.paper_type_code,c.paper_type_name,r.published_time::text published_time,
+        coalesce((select jsonb_agg(distinct q.question_type) from cm_collection_item ci
+                   join cm_question_revision q on q.id=ci.question_revision_id where ci.collection_revision_id=r.id),'[]')::text question_types_json,
+        coalesce((select jsonb_agg(jsonb_build_object('id',x.id::text,'name',x.subject_name) order by x.subject_name,x.id)
+                   from (select distinct es.id,es.subject_name from cm_collection_item ci
+                         join cm_question_revision qr on qr.id=ci.question_revision_id
+                         join cm_question q on q.id=qr.question_id join cm_exam_subject es on es.id=q.exam_subject_id
+                         where ci.collection_revision_id=r.id) x),'[]')::text subjects_json
+    </sql>
+    <sql id="activeExamSessionColumns">
+        ,
+        (select s.id from cm_learning_session s where s.user_id=#{userId} and s.collection_revision_id=r.id
+          and s.session_type='past_paper_exam' and s.status in('created','in_progress','submitted','settling')
+          and exists(select 1 from cm_user_goal g where g.id=s.goal_id and g.user_id=#{userId} and g.status='active')
+          order by s.create_time desc,s.id desc limit 1) active_exam_session_id,
+        (select s.status from cm_learning_session s where s.user_id=#{userId} and s.collection_revision_id=r.id
+          and s.session_type='past_paper_exam' and s.status in('created','in_progress','submitted','settling')
+          and exists(select 1 from cm_user_goal g where g.id=s.goal_id and g.user_id=#{userId} and g.status='active')
+          order by s.create_time desc,s.id desc limit 1) active_exam_session_status
+    </sql>
+    <select id="selectPapers" resultType="org.dromara.certmuse.assessment.domain.PastPaperPaperRow">
+        select <include refid="paperColumns"/> <include refid="activeExamSessionColumns"/> <include refid="currentPaper"/>
+        <if test="certificationId != null">and c.certification_id=#{certificationId}</if>
+        <if test="subjectId != null">and exists(select 1 from cm_collection_item ci join cm_question_revision qr on qr.id=ci.question_revision_id join cm_question q on q.id=qr.question_id where ci.collection_revision_id=r.id and q.exam_subject_id=#{subjectId})</if>
+        <if test="keyword != null and keyword != ''">and r.collection_name ilike concat('%',#{keyword},'%')</if>
+        order by r.published_time desc,c.id desc limit #{limit} offset #{offset}
+    </select>
+    <select id="countPapers" resultType="long">
+        select count(*) <include refid="currentPaper"/>
+        <if test="certificationId != null">and c.certification_id=#{certificationId}</if>
+        <if test="subjectId != null">and exists(select 1 from cm_collection_item ci join cm_question_revision qr on qr.id=ci.question_revision_id join cm_question q on q.id=qr.question_id where ci.collection_revision_id=r.id and q.exam_subject_id=#{subjectId})</if>
+        <if test="keyword != null and keyword != ''">and r.collection_name ilike concat('%',#{keyword},'%')</if>
+    </select>
+    <select id="selectPaper" resultType="org.dromara.certmuse.assessment.domain.PastPaperPaperRow">
+        select <include refid="paperColumns"/> <include refid="currentPaper"/> and c.id=#{collectionId}
+    </select>
+    <sql id="questionColumns">
+        q.id question_id,qr.id question_revision_id,q.exam_subject_id,ci.item_order question_order,qr.question_type,qr.stem,qr.analysis,
+        qr.answer::text answer_json,coalesce(qr.difficulty,'medium') difficulty,qr.estimated_seconds,
+        coalesce(nullif(btrim(q.evidence_group_key),''),concat('Q:',q.id)) evidence_group_key,ci.report_score::text report_score,
+        coalesce((select jsonb_agg(jsonb_build_object('label',o.option_label,'content',o.option_text,'sortOrder',o.sort_order) order by o.sort_order,o.id) from cm_question_option o where o.question_revision_id=qr.id),'[]')::text options_json,
+        coalesce((select jsonb_agg(jsonb_build_object('sourceUrl',im.source_url,'storagePath',im.storage_path,'altText',im.alt_text,'sortOrder',im.image_order) order by im.image_order,im.id) from cm_question_image im where im.question_revision_id=qr.id),'[]')::text images_json,
+        coalesce((select jsonb_agg(jsonb_build_object('knowledgePointId',kp.id::text,'examSubjectId',kp.exam_subject_id::text,'relationRole','tested') order by kp.id) from cm_question_knowledge qk join cm_knowledge_point kp on kp.id=qk.knowledge_point_id where qk.question_revision_id=qr.id and kp.del_flag='0' and kp.status='0' and not exists(select 1 from cm_knowledge_point child where child.parent_id=kp.id and child.del_flag='0' and child.status='0')),'[]')::text knowledge_json
+    </sql>
+    <select id="selectPublishedQuestions" resultType="org.dromara.certmuse.assessment.domain.PastPaperQuestionRow">
+        select <include refid="questionColumns"/> from cm_collection c
+        join cm_collection_current cur on cur.collection_id=c.id join cm_collection_revision r on r.id=cur.collection_revision_id
+        join cm_exam_certification cert on cert.id=c.certification_id and cert.status='0'
+        join cm_collection_item ci on ci.collection_revision_id=r.id join cm_question_revision qr on qr.id=ci.question_revision_id
+        join cm_question q on q.id=qr.question_id
+        where c.status='0' and c.collection_type='PAST_PAPER' and r.status='published' and r.collection_type='PAST_PAPER' and c.id=#{collectionId} order by ci.item_order
+    </select>
+    <select id="selectPublishedQuestion" resultType="org.dromara.certmuse.assessment.domain.PastPaperQuestionRow">
+        select <include refid="questionColumns"/> from cm_collection c
+        join cm_collection_current cur on cur.collection_id=c.id join cm_collection_revision r on r.id=cur.collection_revision_id
+        join cm_exam_certification cert on cert.id=c.certification_id and cert.status='0'
+        join cm_collection_item ci on ci.collection_revision_id=r.id join cm_question_revision qr on qr.id=ci.question_revision_id
+        join cm_question q on q.id=qr.question_id
+        where c.status='0' and c.collection_type='PAST_PAPER' and r.status='published' and r.collection_type='PAST_PAPER' and c.id=#{collectionId} and ci.item_order=#{questionOrder}
+    </select>
+    <select id="selectActiveGoal" resultType="org.dromara.certmuse.assessment.domain.PastPaperGoalRow">
+        select goal.id,goal.certification_id,cert.certification_name,goal.syllabus_version_id,goal.row_version
+          from cm_user_goal goal
+          join cm_exam_certification cert on cert.id=goal.certification_id and cert.status='0'
+         where goal.user_id=#{userId} and goal.status='active'
+         order by goal.update_time desc,goal.id desc limit 1
+    </select>
+    <select id="selectPublishedRuleVersion" resultType="long">select id from cm_profile_rule_version where status='published' order by id desc limit 1</select>
+    <select id="selectIdempotency" resultType="org.dromara.certmuse.assessment.domain.PastPaperIdempotencyRow">
+        select id,payload_hash,status,resource_id,response_body::text from cm_idempotency_record where action_code=#{action} and request_id=#{requestId}
+    </select>
+    <insert id="insertIdempotency">insert into cm_idempotency_record(id,action_code,request_id,payload_hash,status,expires_time) values(#{id},#{action},#{requestId},#{payloadHash},'processing',now()+interval '24 hours') on conflict do nothing</insert>
+    <update id="completeIdempotency">update cm_idempotency_record set status='succeeded',resource_type=#{resourceType},resource_id=#{resourceId},response_status=200,response_body=#{responseBody}::jsonb,update_time=now() where id=#{id} and status='processing'</update>
+    <select id="selectActiveSession" resultType="org.dromara.certmuse.assessment.domain.PastPaperSessionRow">
+        select s.id,s.user_id,s.goal_id,s.collection_revision_id,s.rule_version_id,s.session_type,s.status,s.row_version,
+               s.duration_seconds_snapshot,s.started_time,s.submitted_time,s.deadline_time,s.formal_attempt_no,count(sq.id)::int total_count,
+               count(a.id) filter(where a.status='submitted')::int answered_count
+          from cm_learning_session s left join cm_session_question sq on sq.session_id=s.id
+          left join cm_question_attempt a on a.session_question_id=sq.id and a.status='submitted'
+         where s.user_id=#{userId} and s.goal_id=#{goalId} and s.collection_revision_id=#{revisionId} and s.session_type=#{sessionType}
+           and s.status in('created','in_progress','submitted','settling') group by s.id order by s.create_time desc,s.id desc limit 1
+    </select>
+    <select id="nextFormalAttemptNo" resultType="int">select coalesce(max(formal_attempt_no),0)+1 from cm_learning_session where user_id=#{userId} and goal_id=#{goalId} and collection_revision_id=#{revisionId} and session_type='past_paper_exam'</select>
+    <insert id="insertSession">
+        insert into cm_learning_session(id,user_id,goal_id,session_type,status,rule_version_id,request_id,started_time,certification_id,syllabus_version_id,collection_revision_id,row_version,timing_mode,duration_seconds_snapshot,deadline_time,formal_attempt_no)
+        values(#{id},#{userId},#{goal.id},#{sessionType},'in_progress',#{ruleVersionId},#{requestId},now(),#{goal.certificationId},#{goal.syllabusVersionId},#{revisionId},0,
+            case when #{sessionType}='past_paper_exam' then 'standard' else null end,#{durationSeconds,jdbcType=INTEGER},
+            case when cast(#{durationSeconds,jdbcType=INTEGER} as integer) is null then null
+                 else now()+cast(#{durationSeconds,jdbcType=INTEGER} as integer)*interval '1 second' end,#{formalAttemptNo})
+        on conflict do nothing
+    </insert>
+    <insert id="insertSessionQuestion">
+        insert into cm_session_question(id,session_id,question_id,question_revision_id,exam_subject_id,question_order,evidence_group_key,difficulty_snapshot,estimated_seconds_snapshot,presentation_snapshot,grading_snapshot,knowledge_snapshot,hint_allowed)
+        values(#{id},#{sessionId},#{question.questionId},#{question.questionRevisionId},#{question.examSubjectId},#{question.questionOrder},#{question.evidenceGroupKey},#{question.difficulty},#{question.estimatedSeconds},#{presentation}::jsonb,#{grading}::jsonb,#{knowledge}::jsonb,false)
+    </insert>
+    <select id="selectSession" resultType="org.dromara.certmuse.assessment.domain.PastPaperSessionRow">
+        select s.id,s.user_id,s.goal_id,s.collection_revision_id,s.rule_version_id,s.session_type,s.status,s.row_version,s.duration_seconds_snapshot,s.started_time,s.submitted_time,s.deadline_time,s.formal_attempt_no,count(sq.id)::int total_count,count(a.id) filter(where a.status='submitted')::int answered_count from cm_learning_session s left join cm_session_question sq on sq.session_id=s.id left join cm_question_attempt a on a.session_question_id=sq.id and a.status='submitted' where s.id=#{sessionId} and s.user_id=#{userId} and s.session_type in('past_paper_practice','past_paper_exam') group by s.id
+    </select>
+    <select id="lockSession" resultType="org.dromara.certmuse.assessment.domain.PastPaperSessionRow">
+        select s.id,s.user_id,s.goal_id,s.collection_revision_id,s.rule_version_id,s.session_type,s.status,s.row_version,
+               s.duration_seconds_snapshot,s.started_time,s.submitted_time,s.deadline_time,s.formal_attempt_no,
+               (select count(*)::int from cm_session_question sq where sq.session_id=s.id) total_count,
+               (select count(*)::int from cm_session_question sq join cm_question_attempt a
+                  on a.session_question_id=sq.id and a.status='submitted' where sq.session_id=s.id) answered_count
+          from cm_learning_session s
+         where s.id=#{sessionId} and s.user_id=#{userId}
+           and s.session_type in('past_paper_practice','past_paper_exam')
+         for update of s
+    </select>
+    <select id="lockSessionForWorker" resultType="org.dromara.certmuse.assessment.domain.PastPaperSessionRow">
+        select s.id,s.user_id,s.goal_id,s.collection_revision_id,s.rule_version_id,s.session_type,s.status,s.row_version,
+               s.duration_seconds_snapshot,s.started_time,s.submitted_time,s.deadline_time,s.formal_attempt_no,
+               (select count(*)::int from cm_session_question sq where sq.session_id=s.id) total_count,
+               (select count(*)::int from cm_session_question sq join cm_question_attempt a
+                  on a.session_question_id=sq.id and a.status='submitted' where sq.session_id=s.id) answered_count
+          from cm_learning_session s
+         where s.id=#{sessionId} and s.session_type='past_paper_exam'
+         for update of s
+    </select>
+    <select id="selectSessionQuestions" resultType="org.dromara.certmuse.assessment.domain.PastPaperQuestionRow">
+        select sq.id session_question_id,sq.question_id,sq.question_revision_id,sq.exam_subject_id,sq.question_order,sq.evidence_group_key,sq.difficulty_snapshot difficulty,sq.estimated_seconds_snapshot estimated_seconds,sq.presentation_snapshot::text presentation_snapshot,sq.grading_snapshot::text grading_snapshot,sq.knowledge_snapshot::text knowledge_snapshot,sq.ai_rubric_snapshot::text ai_rubric_snapshot,d.answer_data::text draft_answer_json,a.id attempt_id,aa.answer_data::text final_answer_json,aa.score::text score,aa.max_score::text max_score,aa.score_rate::text score_rate,aa.grading_status,aa.grading_result::text grading_result,case when aa.score_rate is null then null else aa.score_rate=1 end correct,a.profile_applied
+          from cm_session_question sq join cm_learning_session s on s.id=sq.session_id left join cm_past_paper_draft d on d.session_question_id=sq.id and d.user_id=#{userId} left join cm_question_attempt a on a.session_question_id=sq.id and a.status='submitted' left join cm_attempt_answer aa on aa.attempt_id=a.id where sq.session_id=#{sessionId} and s.user_id=#{userId} order by sq.question_order
+    </select>
+    <select id="selectSessionQuestion" resultType="org.dromara.certmuse.assessment.domain.PastPaperQuestionRow">
+        select sq.id session_question_id,sq.question_id,sq.question_revision_id,sq.exam_subject_id,sq.question_order,sq.evidence_group_key,sq.difficulty_snapshot difficulty,sq.estimated_seconds_snapshot estimated_seconds,sq.presentation_snapshot::text presentation_snapshot,sq.grading_snapshot::text grading_snapshot,sq.knowledge_snapshot::text knowledge_snapshot,sq.ai_rubric_snapshot::text ai_rubric_snapshot,d.answer_data::text draft_answer_json,a.id attempt_id,aa.answer_data::text final_answer_json,aa.score::text score,aa.max_score::text max_score,aa.score_rate::text score_rate,aa.grading_status,aa.grading_result::text grading_result,case when aa.score_rate is null then null else aa.score_rate=1 end correct,a.profile_applied from cm_session_question sq join cm_learning_session s on s.id=sq.session_id left join cm_past_paper_draft d on d.session_question_id=sq.id and d.user_id=#{userId} left join cm_question_attempt a on a.session_question_id=sq.id and a.status='submitted' left join cm_attempt_answer aa on aa.attempt_id=a.id where sq.session_id=#{sessionId} and s.user_id=#{userId} and sq.question_order=#{questionOrder}
+    </select>
+    <select id="selectPendingPracticeSubjectiveAttempts" resultType="org.dromara.certmuse.assessment.domain.PastPaperQuestionRow">
+        select sq.id session_question_id,s.id session_id,s.user_id,s.goal_id,s.rule_version_id,
+               sq.question_id,sq.question_revision_id,sq.exam_subject_id,sq.question_order,sq.evidence_group_key,
+               sq.difficulty_snapshot difficulty,sq.presentation_snapshot::text presentation_snapshot,
+               sq.grading_snapshot::text grading_snapshot,sq.knowledge_snapshot::text knowledge_snapshot,
+               sq.ai_rubric_snapshot::text ai_rubric_snapshot,a.id attempt_id,aa.answer_data::text final_answer_json,
+               aa.score::text score,aa.max_score::text max_score,aa.score_rate::text score_rate,
+               aa.grading_status,aa.grading_result::text grading_result,a.profile_applied
+          from cm_learning_session s join cm_session_question sq on sq.session_id=s.id
+          join cm_question_attempt a on a.session_question_id=sq.id and a.status='submitted'
+          join cm_attempt_answer aa on aa.attempt_id=a.id and aa.grading_status='pending'
+         where s.session_type='past_paper_practice'
+           and sq.presentation_snapshot->>'questionType' in ('CASE','ESSAY')
+         order by a.submitted_time,a.id limit #{limit}
+    </select>
+    <insert id="saveDraft">insert into cm_past_paper_draft(session_question_id,user_id,answer_data,row_version,saved_time) values(#{sessionQuestionId},#{userId},#{answerData}::jsonb,0,now()) on conflict(session_question_id) do update set answer_data=excluded.answer_data,row_version=cm_past_paper_draft.row_version+1,saved_time=now() where cm_past_paper_draft.user_id=excluded.user_id</insert>
+    <update id="incrementSessionVersion">update cm_learning_session set row_version=row_version+1,update_time=now() where id=#{sessionId} and row_version=#{expectedVersion} and status='in_progress'</update>
+    <insert id="insertAttempt">insert into cm_question_attempt(id,session_question_id,user_id,attempt_no,status,create_request_id,submit_request_id,submitted_time,timer_status,is_blank,is_skipped,is_first_attempt,is_repeat_attempt,profile_applied) values(#{id},#{sessionQuestionId},#{userId},1,'submitted',#{requestId},#{requestId},now(),'missing',#{blank},#{skipped},#{firstAttempt},#{repeatAttempt},#{profileApplied}) on conflict do nothing</insert>
+    <insert id="insertAttemptAnswer">insert into cm_attempt_answer(id,attempt_id,answer_data,score,max_score,score_rate,grading_status,graded_time) values(#{id},#{attemptId},#{answerData}::jsonb,#{score}::numeric,#{maxScore}::numeric,#{scoreRate}::numeric,'graded',now())</insert>
+    <insert id="insertPendingSubjectiveAttemptAnswer">insert into cm_attempt_answer(id,attempt_id,answer_data,max_score,grading_status,grading_source,grading_revision_no) values(#{id},#{attemptId},#{answerData}::jsonb,#{maxScore}::numeric,'pending','AI',1)</insert>
+    <update id="updateAiRubricSnapshot">update cm_session_question set ai_rubric_snapshot=#{rubric}::jsonb where id=#{sessionQuestionId} and ai_rubric_snapshot is null</update>
+    <update id="scoreSubjectiveAttempt">update cm_attempt_answer set score=#{score}::numeric,max_score=#{maxScore}::numeric,score_rate=#{scoreRate}::numeric,grading_status='graded',grading_result=#{result}::jsonb,graded_time=now() where attempt_id=#{attemptId} and grading_status='pending'</update>
+    <update id="failSubjectiveAttempt">update cm_attempt_answer set score=0,max_score=#{maxScore}::numeric,score_rate=0,grading_status='failed',grading_result=#{result}::jsonb,graded_time=now() where attempt_id=#{attemptId} and grading_status='pending'</update>
+    <update id="markSubmitted">update cm_learning_session set status='submitted',submitted_time=coalesce(submitted_time,now()),row_version=row_version+1,status_changed_time=now(),update_time=now() where id=#{sessionId} and status='in_progress'<if test="expectedVersion != null"> and row_version=#{expectedVersion}</if></update>
+    <update id="markSettling">update cm_learning_session set status='settling',status_changed_time=now(),update_time=now() where id=#{sessionId} and status='submitted'</update>
+    <update id="markCompleted">update cm_learning_session set status='completed',settled_time=coalesce(settled_time,now()),status_changed_time=now(),update_time=now() where id=#{sessionId} and status='settling'</update>
+    <insert id="insertJob">insert into cm_async_job(id,job_type,business_key,payload,status,next_run_time) values(#{id},'PAST_PAPER_RESULT',#{businessKey},#{payload}::jsonb,'queued',now()) on conflict(job_type,business_key) do nothing</insert>
+    <select id="selectLatestDisclosure" resultType="string">select disclosed_time::text from cm_past_paper_answer_disclosure where user_id=#{userId} and question_id=#{questionId} order by disclosed_time desc,id desc limit 1</select>
+    <insert id="insertDisclosure">insert into cm_past_paper_answer_disclosure(id,user_id,question_id,question_revision_id,collection_revision_id,request_id,disclosed_time) values(#{id},#{userId},#{question.questionId},#{question.questionRevisionId},#{collectionRevisionId},#{requestId},now())</insert>
+    <select id="lockExpiredExamSessions" resultType="org.dromara.certmuse.assessment.domain.PastPaperSessionRow">
+        select id,user_id,goal_id,collection_revision_id,rule_version_id,session_type,status,row_version,duration_seconds_snapshot,started_time,submitted_time,deadline_time,formal_attempt_no,0 total_count,0 answered_count from cm_learning_session where session_type='past_paper_exam' and status='in_progress' and deadline_time&lt;=now() order by deadline_time,id limit #{limit} for update skip locked
+    </select>
+    <select id="selectJobStatus" resultType="string">select status from cm_async_job where job_type='PAST_PAPER_RESULT' and business_key=#{businessKey}</select>
+    <select id="selectQueuedResultSessionIds" resultType="long">select cast(substring(business_key from 'PAST_PAPER:(.*)') as bigint) from cm_async_job where job_type='PAST_PAPER_RESULT' and status='queued' and next_run_time&lt;=now() order by next_run_time,id limit #{limit}</select>
+    <update id="claimJob">update cm_async_job set status='running',attempt_count=attempt_count+1,started_time=now(),update_time=now() where job_type='PAST_PAPER_RESULT' and business_key=#{businessKey} and status='queued'</update>
+    <update id="markJobSucceeded">update cm_async_job set status='succeeded',finished_time=now(),update_time=now() where job_type='PAST_PAPER_RESULT' and business_key=#{businessKey}</update>
+    <update id="markJobFailed">update cm_async_job set status='failed',last_error=#{message},finished_time=now(),update_time=now() where job_type='PAST_PAPER_RESULT' and business_key=#{businessKey}</update>
+    <update id="retryJob">update cm_async_job set status='queued',next_run_time=now(),last_error=null,finished_time=null,update_time=now() where job_type='PAST_PAPER_RESULT' and business_key=#{businessKey} and status='failed'</update>
+    <select id="countRecentEvidence" resultType="int">select count(*) from cm_learning_evidence where user_id=#{userId} and goal_id=#{goalId} and evidence_group_key=#{evidenceGroupKey} and is_valid=true</select>
+    <select id="selectLatestEvidenceTime" resultType="string">select max(answered_at)::text from cm_learning_evidence where user_id=#{userId} and goal_id=#{goalId} and evidence_group_key=#{evidenceGroupKey} and is_valid=true</select>
+    <insert id="insertErrorRecord">insert into cm_error_record(id,user_id,goal_id,attempt_id,knowledge_point_id,evidence_group_key) values(#{id},#{userId},#{goalId},#{attemptId},#{knowledgePointId},#{groupKey}) on conflict do nothing</insert>
+    <select id="insertSettlement" resultType="long">insert into cm_profile_settlement(id,user_id,goal_id,exam_subject_id,knowledge_point_id,settlement_type,source_session_id,source_attempt_id,scoring_revision_no,settlement_revision_no,settlement_snapshot,entry_direct_ability,evidence_count,aggregate_evidence_value,positive_ratio,negative_ratio,effective_impact_coefficient,tentative_direct_ability,final_direct_ability,status,rule_version_id,request_id,settled_time) values(#{id},#{userId},#{goalId},#{subjectId},#{knowledgePointId},'single',#{sessionId},#{attemptId},1,1,'{"schema_version":"past_paper_settlement/1.0"}'::jsonb,50,1,50,0,0,#{coefficient}::numeric,50,50,'settled',#{ruleVersionId},#{requestId},now()) on conflict(source_attempt_id,knowledge_point_id,scoring_revision_no) where settlement_type='single' do update set id=cm_profile_settlement.id returning id</select>
+    <insert id="insertEvidence">insert into cm_learning_evidence(id,settlement_id,user_id,goal_id,session_id,attempt_id,exam_subject_id,knowledge_point_id,evidence_group_key,behavior_type,difficulty_snapshot,score_rate,raw_evidence_value,direction,hint_level,elapsed_seconds,timer_status,hint_coefficient,time_coefficient,combined_coefficient,behavior_coefficient,streak_coefficient,is_distinct_question,is_valid,rule_version_id,answered_at,effective_at,settlement_sequence) values(#{id},#{settlementId},#{userId},#{goalId},#{sessionId},#{attemptId},#{subjectId},#{knowledgePointId},#{groupKey},#{behaviorType},#{difficulty},#{scoreRate}::numeric,case when #{direction}='positive' then 85 else 25 end,#{direction},'none',null,'missing',1,1,1,#{coefficient}::numeric,1,#{distinct},true,#{ruleVersionId},now(),now(),coalesce((select max(settlement_sequence)+1 from cm_learning_evidence x where x.user_id=#{userId} and x.goal_id=#{goalId} and x.knowledge_point_id=#{knowledgePointId}),1)) on conflict(attempt_id,knowledge_point_id) where is_valid=true do nothing</insert>
+    <insert id="upsertKnowledgeProfile">
+        insert into cm_knowledge_profile(id,user_id,goal_id,knowledge_point_id,baseline_direct_ability,current_direct_ability,
+            confidence_level,profile_status,distinct_question_count,last_direct_evidence_time,recent_trend,rule_version_id,calculated_time)
+        values(#{id},#{userId},#{goalId},#{knowledgePointId},50,
+            50 + #{coefficient}::numeric * (case when #{correct} then 85 else 25 end - 50),
+            'low','provisional',case when #{coefficient}::numeric = 0.03 then 0 else 1 end,now(),'stable',#{ruleVersionId},now())
+        on conflict(user_id,goal_id,knowledge_point_id) do update set
+            current_direct_ability=case when #{correct} then least(100,cm_knowledge_profile.current_direct_ability +
+                #{coefficient}::numeric * greatest(0,85-cm_knowledge_profile.current_direct_ability))
+                else greatest(0,cm_knowledge_profile.current_direct_ability - #{coefficient}::numeric *
+                greatest(0,cm_knowledge_profile.current_direct_ability-25)) end,
+            distinct_question_count=(select count(*) from cm_learning_evidence e where e.user_id=#{userId}
+                and e.goal_id=#{goalId} and e.knowledge_point_id=#{knowledgePointId} and e.is_valid=true
+                and e.is_distinct_question=true),
+            confidence_level=case when (select count(*) from cm_learning_evidence e where e.user_id=#{userId}
+                and e.goal_id=#{goalId} and e.knowledge_point_id=#{knowledgePointId} and e.is_valid=true
+                and e.is_distinct_question=true) &lt;= 1 then 'low' else 'medium' end,
+            last_direct_evidence_time=now(),rule_version_id=#{ruleVersionId},calculated_time=now(),
+            row_version=cm_knowledge_profile.row_version+1,update_time=now()
+    </insert>
+    <insert id="upsertScoredKnowledgeProfile">
+        insert into cm_knowledge_profile(id,user_id,goal_id,knowledge_point_id,baseline_direct_ability,current_direct_ability,
+            confidence_level,profile_status,distinct_question_count,last_direct_evidence_time,recent_trend,rule_version_id,calculated_time)
+        values(#{id},#{userId},#{goalId},#{knowledgePointId},50,50+#{coefficient}::numeric*(#{scoreRate}::numeric*100-50),
+            'low','provisional',case when #{coefficient}::numeric=0.03 then 0 else 1 end,now(),'stable',#{ruleVersionId},now())
+        on conflict(user_id,goal_id,knowledge_point_id) do update set
+            current_direct_ability=greatest(0,least(100,cm_knowledge_profile.current_direct_ability+
+                #{coefficient}::numeric*(#{scoreRate}::numeric*100-cm_knowledge_profile.current_direct_ability))),
+            last_direct_evidence_time=now(),rule_version_id=#{ruleVersionId},calculated_time=now(),
+            row_version=cm_knowledge_profile.row_version+1,update_time=now()
+    </insert>
+    <update id="updateSettlementFinal">
+        update cm_profile_settlement ps set final_direct_ability=kp.current_direct_ability,
+            tentative_direct_ability=kp.current_direct_ability,update_time=now()
+        from cm_knowledge_profile kp where ps.id=#{settlementId} and kp.user_id=ps.user_id and kp.goal_id=ps.goal_id
+          and kp.knowledge_point_id=ps.knowledge_point_id
+    </update>
+    <update id="aggregateSubjectProfiles">
+        update cm_subject_profile sp set knowledge_aggregate_score=x.ability,subject_ability=x.ability,
+            target_coverage_rate=x.coverage,medium_high_coverage_rate=x.confident_coverage,confidence_level=x.confidence,
+            rule_version_id=#{ruleVersionId},calculated_time=now(),row_version=sp.row_version+1,update_time=now()
+        from (select kp.exam_subject_id,sum(p.current_direct_ability*kp.importance)/nullif(sum(kp.importance),0) ability,
+                     count(p.id)::numeric/nullif(count(*)::numeric,0) coverage,
+                     count(p.id) filter(where p.confidence_level in('medium','high'))::numeric/nullif(count(*)::numeric,0) confident_coverage,
+                     case when count(p.id)=0 then 'unassessed' when bool_and(p.confidence_level in('medium','high')) then 'medium' else 'low' end confidence
+              from cm_knowledge_point kp left join cm_knowledge_profile p on p.knowledge_point_id=kp.id
+                   and p.user_id=#{userId} and p.goal_id=#{goalId}
+              where kp.del_flag='0' and kp.status='0' and not exists(select 1 from cm_knowledge_point c where c.parent_id=kp.id and c.del_flag='0' and c.status='0')
+              group by kp.exam_subject_id) x
+        where sp.user_id=#{userId} and sp.goal_id=#{goalId} and sp.exam_subject_id=x.exam_subject_id
+    </update>
+    <update id="aggregateOverallProfile">
+        update cm_overall_profile op set overall_ability=x.ability,rule_version_id=#{ruleVersionId},calculated_time=now(),
+            row_version=op.row_version+1,update_time=now()
+        from (select sum(p.current_direct_ability*kp.importance)/nullif(sum(kp.importance),0) ability
+              from cm_knowledge_point kp join cm_knowledge_profile p on p.knowledge_point_id=kp.id
+              where p.user_id=#{userId} and p.goal_id=#{goalId} and kp.del_flag='0' and kp.status='0'
+                and not exists(select 1 from cm_knowledge_point c where c.parent_id=kp.id and c.del_flag='0' and c.status='0')) x
+        where op.user_id=#{userId} and op.goal_id=#{goalId}
+    </update>
+    <insert id="insertReport">insert into cm_assessment_report(id,session_id,user_id,goal_id,report_type,total_score,max_score,subject_scores,profile_summary,status,rule_version_id,generated_time) values(#{id},#{session.id},#{session.userId},#{session.goalId},#{reportType},#{totalScore}::numeric,#{maxScore}::numeric,#{subjectScores}::jsonb,#{profileSummary}::jsonb,'available',#{session.ruleVersionId},now()) on conflict(session_id,report_type) do nothing</insert>
+    <select id="selectReport" resultType="string">select jsonb_build_object('score',total_score::text,'maxScore',max_score::text,'subjectScores',subject_scores,'profileSummary',profile_summary,'status',status)::text from cm_assessment_report where user_id=#{userId} and session_id=#{sessionId} order by id desc limit 1</select>
+</mapper>

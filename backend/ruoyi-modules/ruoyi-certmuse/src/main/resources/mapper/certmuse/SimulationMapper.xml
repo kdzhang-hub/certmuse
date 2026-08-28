@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.dromara.certmuse.assessment.mapper.SimulationMapper">
+    <sql id="publishedSimulationJoins">
+        from cm_collection_current current_revision
+        join cm_collection c on c.id=current_revision.collection_id and c.status='0'
+        join cm_collection_revision r on r.id=current_revision.collection_revision_id
+             and r.collection_id=c.id and r.status='published' and r.collection_type='SIMULATION'
+        join cm_exam_certification certification on certification.id=r.certification_id and certification.status='0'
+        join cm_syllabus_version syllabus on syllabus.id=r.syllabus_version_id
+             and syllabus.certification_id=certification.id
+    </sql>
+
+    <sql id="publishedSimulationFilters">
+        <if test="certificationId != null">and r.certification_id=#{certificationId}</if>
+        <if test="syllabusVersionId != null">and r.syllabus_version_id=#{syllabusVersionId}</if>
+        <if test="keyword != null">and r.collection_name ilike concat('%',#{keyword},'%')</if>
+    </sql>
+
+    <sql id="paperColumns">
+        c.id collection_id,r.id revision_id,c.collection_code,r.collection_name,
+        r.certification_id,certification.certification_name,r.syllabus_version_id,
+        syllabus.version_name syllabus_version_name,r.question_count,r.total_report_score,
+        r.duration_minutes,r.published_time,
+        count(distinct q.exam_subject_id)::int subject_count,min(q.exam_subject_id) subject_id,
+        min(subject.subject_name) subject_name,
+        coalesce(bool_or(question_revision.question_type='CHOICE'),false) has_choice,
+        coalesce(bool_or(question_revision.question_type='CASE'),false) has_case,
+        coalesce(bool_or(question_revision.question_type='ESSAY'),false) has_essay,
+        count(item.id)::int actual_question_count,coalesce(sum(item.report_score),0) actual_total_report_score,
+        (select s.id from cm_learning_session s where s.user_id=#{userId} and s.collection_revision_id=r.id
+          and s.session_type='simulation' and s.status in('created','in_progress','submitted','settling')
+          and exists(select 1 from cm_user_goal g where g.id=s.goal_id and g.user_id=#{userId} and g.status='active')
+          order by s.create_time desc,s.id desc limit 1) active_session_id,
+        (select s.status from cm_learning_session s where s.user_id=#{userId} and s.collection_revision_id=r.id
+          and s.session_type='simulation' and s.status in('created','in_progress','submitted','settling')
+          and exists(select 1 from cm_user_goal g where g.id=s.goal_id and g.user_id=#{userId} and g.status='active')
+          order by s.create_time desc,s.id desc limit 1) active_session_status
+    </sql>
+
+    <sql id="paperItemJoins">
+        left join cm_collection_item item on item.collection_revision_id=r.id
+        left join cm_question_revision question_revision on question_revision.id=item.question_revision_id
+        left join cm_question q on q.id=question_revision.question_id and q.del_flag='0'
+        left join cm_exam_subject subject on subject.id=q.exam_subject_id
+             and subject.certification_id=r.certification_id
+    </sql>
+
+    <sql id="paperGroupBy">
+        group by c.id,r.id,certification.id,syllabus.id
+    </sql>
+
+    <select id="selectCurrentGoal" resultType="org.dromara.certmuse.assessment.domain.SimulationGoalRow">
+        select goal.id,goal.certification_id,certification.certification_name,goal.syllabus_version_id,
+               syllabus.version_name syllabus_version_name,goal.row_version
+          from cm_user_goal goal
+          join cm_exam_certification certification on certification.id=goal.certification_id
+          join cm_syllabus_version syllabus on syllabus.id=goal.syllabus_version_id
+         where goal.user_id=#{userId} and goal.status='active'
+         order by goal.update_time desc,goal.id desc
+         limit 1
+    </select>
+    <select id="lockCurrentGoal" resultType="org.dromara.certmuse.assessment.domain.SimulationGoalRow">
+        select goal.id,goal.certification_id,certification.certification_name,goal.syllabus_version_id,syllabus.version_name syllabus_version_name,goal.row_version from cm_user_goal goal join cm_exam_certification certification on certification.id=goal.certification_id join cm_syllabus_version syllabus on syllabus.id=goal.syllabus_version_id where goal.user_id=#{userId} and goal.status='active' order by goal.update_time desc,goal.id desc limit 1 for update
+    </select>
+    <select id="selectPublishedRuleVersion" resultType="long">select id from cm_profile_rule_version where status='published' order by published_time desc,id desc limit 1</select>
+    <select id="selectPublishedSimulationSessionQuestions" resultType="org.dromara.certmuse.assessment.domain.SimulationSessionQuestionRow">
+        select q.id question_id,qr.id question_revision_id,q.exam_subject_id,item.item_order question_order,qr.question_type,qr.stem,qr.answer::text answer_json,qr.analysis,coalesce(qr.difficulty,'medium') difficulty,qr.estimated_seconds,coalesce(nullif(btrim(q.evidence_group_key),''),concat('Q:',q.id)) evidence_group_key,item.report_score::text report_score,coalesce((select jsonb_agg(jsonb_build_object('label',o.option_label,'content',o.option_text,'sortOrder',o.sort_order) order by o.sort_order,o.id) from cm_question_option o where o.question_revision_id=qr.id),'[]')::text options_json,coalesce((select jsonb_agg(jsonb_build_object('sourceUrl',im.source_url,'storagePath',im.storage_path,'altText',im.alt_text,'sortOrder',im.image_order) order by im.image_order,im.id) from cm_question_image im where im.question_revision_id=qr.id),'[]')::text images_json,coalesce((select jsonb_agg(jsonb_build_object('knowledgePointId',kp.id::text,'examSubjectId',kp.exam_subject_id::text,'relationRole','tested') order by kp.id) from cm_question_knowledge qk join cm_knowledge_point kp on kp.id=qk.knowledge_point_id where qk.question_revision_id=qr.id and kp.del_flag='0' and kp.status='0' and not exists(select 1 from cm_knowledge_point child where child.parent_id=kp.id and child.del_flag='0' and child.status='0')),'[]')::text knowledge_json from cm_collection_current current_revision join cm_collection_revision r on r.id=current_revision.collection_revision_id and r.status='published' and r.collection_type='SIMULATION' join cm_collection_item item on item.collection_revision_id=r.id join cm_question_revision qr on qr.id=item.question_revision_id and qr.status='published' join cm_question q on q.id=qr.question_id and q.del_flag='0' where current_revision.collection_id=#{collectionId} order by item.item_order,item.id
+    </select>
+    <select id="nextFormalAttemptNo" resultType="int">select coalesce(max(formal_attempt_no),0)+1 from cm_learning_session where user_id=#{userId} and goal_id=#{goalId} and collection_revision_id=#{revisionId} and session_type='simulation'</select>
+    <insert id="insertSession">insert into cm_learning_session(id,user_id,goal_id,session_type,status,rule_version_id,request_id,started_time,certification_id,syllabus_version_id,collection_revision_id,row_version,timing_mode,duration_seconds_snapshot,deadline_time,formal_attempt_no) values(#{id},#{userId},#{goal.id},'simulation','in_progress',#{ruleVersionId},#{requestId},now(),#{goal.certificationId},#{goal.syllabusVersionId},#{revisionId},0,'standard',#{durationSeconds},now()+(#{durationSeconds} * interval '1 second'),#{formalAttemptNo})</insert>
+    <insert id="insertSessionQuestion">insert into cm_session_question(id,session_id,question_id,question_revision_id,exam_subject_id,question_order,evidence_group_key,difficulty_snapshot,estimated_seconds_snapshot,presentation_snapshot,grading_snapshot,knowledge_snapshot,hint_allowed) values(#{id},#{sessionId},#{question.questionId},#{question.questionRevisionId},#{question.examSubjectId},#{question.questionOrder},#{question.evidenceGroupKey},#{question.difficulty},#{question.estimatedSeconds},#{presentation}::jsonb,#{grading}::jsonb,#{knowledge}::jsonb,false)</insert>
+    <select id="selectSession" resultType="org.dromara.certmuse.assessment.domain.SimulationAttemptRow">select s.id session_id,s.user_id,s.status,s.row_version,s.deadline_time,count(sq.id)::int total_count,count(a.id) filter(where a.status='submitted')::int answered_count from cm_learning_session s left join cm_session_question sq on sq.session_id=s.id left join cm_question_attempt a on a.session_question_id=sq.id and a.status='submitted' where s.id=#{sessionId} and s.user_id=#{userId} and s.session_type='simulation' group by s.id</select>
+    <select id="lockSession" resultType="org.dromara.certmuse.assessment.domain.SimulationAttemptRow">select s.id session_id,s.user_id,s.status,s.row_version,s.deadline_time,count(sq.id)::int total_count,count(a.id) filter(where a.status='submitted')::int answered_count from cm_learning_session s left join cm_session_question sq on sq.session_id=s.id left join cm_question_attempt a on a.session_question_id=sq.id and a.status='submitted' where s.id=#{sessionId} and s.user_id=#{userId} and s.session_type='simulation' group by s.id for update</select>
+    <select id="selectSessionItems" resultType="org.dromara.certmuse.assessment.domain.SimulationAttemptRow">select s.id session_id,s.goal_id,s.rule_version_id,sq.id session_question_id,sq.question_id,sq.question_revision_id,sq.evidence_group_key,sq.exam_subject_id,sq.difficulty_snapshot difficulty,sq.question_order,sq.presentation_snapshot::text presentation_snapshot,sq.grading_snapshot::text grading_snapshot,sq.knowledge_snapshot::text knowledge_snapshot,a.id attempt_id,aa.answer_data::text,aa.grading_status,aa.score::text score,aa.max_score::text max_score from cm_learning_session s join cm_session_question sq on sq.session_id=s.id left join cm_question_attempt a on a.session_question_id=sq.id and a.status='submitted' left join cm_attempt_answer aa on aa.attempt_id=a.id where s.id=#{sessionId} and s.user_id=#{userId} and s.session_type='simulation' order by sq.question_order</select>
+    <select id="selectSessionItem" resultType="org.dromara.certmuse.assessment.domain.SimulationAttemptRow">select sq.id session_question_id,sq.question_revision_id,sq.question_order,sq.presentation_snapshot::text presentation_snapshot,sq.grading_snapshot::text grading_snapshot,sq.knowledge_snapshot::text knowledge_snapshot,a.id attempt_id,aa.answer_data::text,aa.grading_status from cm_learning_session s join cm_session_question sq on sq.session_id=s.id left join cm_question_attempt a on a.session_question_id=sq.id and a.status='submitted' left join cm_attempt_answer aa on aa.attempt_id=a.id where s.id=#{sessionId} and s.user_id=#{userId} and s.session_type='simulation' and sq.question_order=#{questionOrder}</select>
+    <insert id="insertAttempt">insert into cm_question_attempt(id,session_question_id,user_id,attempt_no,status,create_request_id,submit_request_id,submitted_time,timer_status,is_blank,is_skipped,is_first_attempt,is_repeat_attempt) values(#{id},#{sessionQuestionId},#{userId},1,'submitted',#{requestId},#{requestId},now(),'missing',false,false,true,false)</insert>
+    <insert id="insertAttemptAnswer">insert into cm_attempt_answer(id,attempt_id,answer_data,score,max_score,score_rate,grading_status,graded_time) values(#{id},#{attemptId},#{answerData}::jsonb,#{scoreRate}::numeric,1,#{scoreRate}::numeric,#{status},case when #{status}='graded' then now() else null end)</insert>
+    <update id="scoreSubjectiveAttempt">update cm_attempt_answer set score=#{scoreRate}::numeric,max_score=1,score_rate=#{scoreRate}::numeric,grading_status='graded',grading_result=#{result}::jsonb,graded_time=now() where attempt_id=#{attemptId} and grading_status='pending'</update>
+    <update id="failSubjectiveAttempt">update cm_attempt_answer set score=0,max_score=1,score_rate=0,grading_status='failed',grading_result=#{result}::jsonb,graded_time=now() where attempt_id=#{attemptId} and grading_status='pending'</update>
+    <update id="markSubmitted">update cm_learning_session set status='submitted',submitted_time=now(),status_changed_time=now(),update_time=now() where id=#{sessionId} and user_id=#{userId} and session_type='simulation' and status='in_progress'</update>
+    <update id="markCompleted">update cm_learning_session set status='completed',settled_time=now(),status_changed_time=now(),update_time=now() where id=#{sessionId} and user_id=#{userId} and session_type='simulation' and status='submitted'</update>
+    <insert id="insertReport">insert into cm_assessment_report(id,session_id,user_id,report_type,total_score,max_score,subject_scores,profile_summary) values(#{id},#{sessionId},#{userId},'simulation',#{score}::numeric,#{maxScore}::numeric,'{}'::jsonb,jsonb_build_object('scoreComplete',not #{partial})) on conflict(session_id) do update set total_score=excluded.total_score,max_score=excluded.max_score,profile_summary=excluded.profile_summary</insert>
+    <select id="selectResult" resultType="org.dromara.certmuse.assessment.domain.SimulationAttemptRow">select s.id session_id,s.status,r.total_score::text score,r.max_score::text max_score from cm_learning_session s left join cm_assessment_report r on r.session_id=s.id where s.id=#{sessionId} and s.user_id=#{userId} and s.session_type='simulation'</select>
+    <insert id="insertErrorRecord">insert into cm_error_record(id,user_id,goal_id,attempt_id,knowledge_point_id,evidence_group_key) values(#{id},#{userId},#{goalId},#{attemptId},#{knowledgePointId},#{groupKey}) on conflict do nothing</insert>
+
+    <select id="selectSetupOptions" resultType="org.dromara.certmuse.assessment.domain.SimulationOptionRow">
+        select distinct certification.id certification_id,certification.certification_name,
+               certification.sort_order certification_sort_order,syllabus.id syllabus_version_id,
+               syllabus.version_name syllabus_version_name,syllabus.published_date syllabus_published_date
+        <include refid="publishedSimulationJoins"/>
+        order by certification.sort_order,certification.id,syllabus.published_date desc nulls last,syllabus.id desc
+    </select>
+
+    <select id="selectPublishedSimulations" resultType="org.dromara.certmuse.assessment.domain.SimulationPaperRow">
+        select <include refid="paperColumns"/>
+        <include refid="publishedSimulationJoins"/>
+        <include refid="paperItemJoins"/>
+        where 1=1 <include refid="publishedSimulationFilters"/>
+        <include refid="paperGroupBy"/>
+        order by r.published_time desc,c.id desc
+        limit #{limit} offset #{offset}
+    </select>
+
+    <select id="countPublishedSimulations" resultType="long">
+        select count(*)
+        <include refid="publishedSimulationJoins"/>
+        where 1=1 <include refid="publishedSimulationFilters"/>
+    </select>
+
+    <select id="selectPublishedSimulation" resultType="org.dromara.certmuse.assessment.domain.SimulationPaperRow">
+        select <include refid="paperColumns"/>
+        <include refid="publishedSimulationJoins"/>
+        <include refid="paperItemJoins"/>
+        where c.id=#{collectionId}
+        <include refid="paperGroupBy"/>
+    </select>
+
+    <select id="selectPublishedSimulationPreviewQuestions"
+            resultType="org.dromara.certmuse.assessment.domain.SimulationPreviewQuestionRow">
+        select item.item_order question_order,question_revision.question_type,question_revision.stem
+        <include refid="publishedSimulationJoins"/>
+        join cm_collection_item item on item.collection_revision_id=r.id
+        join cm_question_revision question_revision on question_revision.id=item.question_revision_id
+             and question_revision.status='published'
+        join cm_question q on q.id=question_revision.question_id and q.del_flag='0'
+        where c.id=#{collectionId}
+        order by item.item_order asc,item.id asc
+    </select>
+</mapper>

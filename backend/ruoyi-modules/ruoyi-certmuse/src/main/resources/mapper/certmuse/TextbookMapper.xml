@@ -1,0 +1,290 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.dromara.certmuse.catalog.mapper.TextbookMapper">
+    <resultMap id="listResult" type="org.dromara.certmuse.catalog.domain.vo.TextbookListVo">
+        <constructor>
+            <arg column="id" javaType="String"/><arg column="certification_id" javaType="String"/>
+            <arg column="syllabus_version_id" javaType="String"/>
+            <arg column="syllabus_version_name" javaType="String"/><arg column="certification_name" javaType="String"/>
+            <arg column="title" javaType="String"/>
+            <arg column="edition" javaType="String"/><arg column="status" javaType="String"/>
+            <arg column="chunk_count" javaType="long"/><arg column="mapped_chunk_count" javaType="long"/>
+            <arg column="unmapped_chunk_count" javaType="long"/><arg column="knowledge_point_count" javaType="long"/>
+            <arg column="latest_import_batch_id" javaType="String"/><arg column="latest_import_status" javaType="String"/>
+            <arg column="create_by" javaType="String"/><arg column="create_by_name" javaType="String"/>
+            <arg column="create_time" javaType="java.time.OffsetDateTime"/><arg column="update_time" javaType="java.time.OffsetDateTime"/>
+            <arg column="deletable" javaType="boolean"/><arg column="delete_disabled_reason" javaType="String"/>
+        </constructor>
+    </resultMap>
+    <resultMap id="detailResult" type="org.dromara.certmuse.catalog.domain.TextbookRows$Detail">
+        <constructor>
+            <arg column="id" javaType="long"/><arg column="syllabus_version_id" javaType="java.lang.Long"/>
+            <arg column="certification_id" javaType="java.lang.Long"/>
+            <arg column="syllabus_version_name" javaType="String"/><arg column="title" javaType="String"/>
+            <arg column="edition" javaType="String"/><arg column="status" javaType="String"/>
+            <arg column="create_by" javaType="java.lang.Long"/><arg column="create_by_name" javaType="String"/>
+            <arg column="create_time" javaType="java.time.OffsetDateTime"/><arg column="update_time" javaType="java.time.OffsetDateTime"/>
+            <arg column="submitted_by_name" javaType="String"/><arg column="submitted_time" javaType="java.time.OffsetDateTime"/>
+            <arg column="reviewed_by_name" javaType="String"/><arg column="reviewed_time" javaType="java.time.OffsetDateTime"/>
+            <arg column="review_comment" javaType="String"/><arg column="published_by_name" javaType="String"/>
+            <arg column="published_time" javaType="java.time.OffsetDateTime"/><arg column="chunk_count" javaType="long"/>
+            <arg column="mapped_chunk_count" javaType="long"/><arg column="unmapped_chunk_count" javaType="long"/>
+            <arg column="knowledge_point_count" javaType="long"/><arg column="image_count" javaType="long"/>
+            <arg column="latest_import_batch_id" javaType="java.lang.Long"/><arg column="source_file_name" javaType="String"/>
+            <arg column="source_file_size" javaType="java.lang.Long"/><arg column="source_file_hash" javaType="String"/>
+            <arg column="latest_import_status" javaType="String"/><arg column="valid_count" javaType="java.lang.Integer"/>
+            <arg column="warning_count" javaType="java.lang.Integer"/><arg column="failed_count" javaType="java.lang.Integer"/>
+            <arg column="latest_import_create_time" javaType="java.time.OffsetDateTime"/>
+            <arg column="latest_import_finished_time" javaType="java.time.OffsetDateTime"/>
+        </constructor>
+    </resultMap>
+    <resultMap id="chunkResult" type="org.dromara.certmuse.catalog.domain.TextbookRows$Chunk">
+        <constructor>
+            <arg column="id" javaType="long"/><arg column="document_id" javaType="long"/>
+            <arg column="chunk_order" javaType="int"/><arg column="heading" javaType="String"/>
+            <arg column="content" javaType="String"/><arg column="heading_path" javaType="String"/>
+            <arg column="source_locator" javaType="String"/><arg column="content_hash" javaType="String"/>
+            <arg column="knowledge_points" javaType="String"/><arg column="update_time" javaType="java.time.OffsetDateTime"/>
+            <arg column="document_status" javaType="String"/>
+        </constructor>
+    </resultMap>
+
+    <sql id="textbookWhere">
+        where d.document_type = 'textbook' and d.del_flag = '0'
+        <if test="visibleUserId != null">and d.create_by = #{visibleUserId}</if>
+        <if test="certificationId != null">and d.certification_id = #{certificationId}</if>
+        <if test="syllabusVersionId != null">and d.syllabus_version_id = #{syllabusVersionId}</if>
+        <if test="createBy != null">and d.create_by = #{createBy}</if>
+        <if test="query.title != null">and d.title ilike concat('%', #{query.title}, '%')</if>
+        <if test="query.edition != null">and d.edition ilike concat('%', #{query.edition}, '%')</if>
+        <if test="query.status != null">and d.status = #{query.status}</if>
+        <if test="query.beginCreateTime != null">and d.create_time between #{query.beginCreateTime} and #{query.endCreateTime}</if>
+    </sql>
+    <sql id="statisticsJoins">
+        left join lateral (
+            select count(distinct c.id) as chunk_count,
+                   count(distinct c.id) filter (where exists(select 1 from cm_chunk_knowledge mapped where mapped.chunk_id = c.id)) as mapped_chunk_count,
+                   count(distinct c.id) filter (where not exists(select 1 from cm_chunk_knowledge mapped where mapped.chunk_id = c.id)) as unmapped_chunk_count,
+                   count(distinct ck.knowledge_point_id) as knowledge_point_count,
+                   count(distinct image.id) as image_count
+            from cm_document_chunk c
+            left join cm_chunk_knowledge ck on ck.chunk_id = c.id
+            left join cm_document_image image on image.chunk_id = c.id
+            where c.document_id = d.id
+        ) stats on true
+        left join lateral (
+            select ib.id, ib.source_file_name, ib.source_file_size, ib.source_file_hash, ib.status,
+                   ib.valid_count, ib.warning_count, ib.failed_count, ib.create_time, ib.finished_time
+            from cm_import_batch ib
+            where ib.document_id = d.id and ib.import_type = 'document_chunk'
+            order by ib.create_time desc, ib.id desc limit 1
+        ) latest on true
+    </sql>
+
+    <select id="selectTextbooks" resultMap="listResult">
+        select cast(d.id as varchar) as id, cast(d.certification_id as varchar) as certification_id,
+               cast(d.syllabus_version_id as varchar) as syllabus_version_id,
+               case when sv.id is null then null else concat(ec.certification_name, ' · ', sv.version_name) end as syllabus_version_name,
+               ec.certification_name,
+               d.title, d.edition, d.status, coalesce(stats.chunk_count, 0) as chunk_count,
+               coalesce(stats.mapped_chunk_count, 0) as mapped_chunk_count,
+               coalesce(stats.unmapped_chunk_count, 0) as unmapped_chunk_count,
+               coalesce(stats.knowledge_point_count, 0) as knowledge_point_count,
+               cast(latest.id as varchar) as latest_import_batch_id, latest.status as latest_import_status,
+               cast(d.create_by as varchar) as create_by, coalesce(creator.nick_name, creator.user_name) as create_by_name,
+               d.create_time, d.update_time, false as deletable, null::varchar as delete_disabled_reason
+        from cm_document d
+        join cm_exam_certification ec on ec.id = d.certification_id
+        left join cm_syllabus_version sv on sv.id = d.syllabus_version_id
+        left join sys_user creator on creator.user_id = d.create_by
+        <include refid="statisticsJoins"/>
+        <include refid="textbookWhere"/>
+        order by
+        <choose>
+            <when test="query.orderByColumn == 'title'">d.title</when>
+            <when test="query.orderByColumn == 'createTime'">d.create_time</when>
+            <when test="query.orderByColumn == 'chunkCount'">coalesce(stats.chunk_count, 0)</when>
+            <otherwise>d.update_time</otherwise>
+        </choose>
+        <choose><when test="query.isAsc != null and query.isAsc.toLowerCase() == 'asc'">asc</when><otherwise>desc</otherwise></choose>, d.id desc
+        limit #{limit} offset #{offset}
+    </select>
+    <select id="countTextbooks" resultType="long">
+        select count(*) from cm_document d <include refid="textbookWhere"/>
+    </select>
+    <select id="selectCertificationOptions" resultType="org.dromara.certmuse.catalog.domain.vo.TextbookOptionVo">
+        select cast(ec.id as varchar) as id, ec.certification_name as label
+        from cm_exam_certification ec
+        where ec.status = '0'
+        order by ec.sort_order, ec.certification_name, ec.id
+    </select>
+    <select id="selectCreatorOptions" resultType="org.dromara.certmuse.catalog.domain.vo.TextbookOptionVo">
+        select distinct cast(d.create_by as varchar) as id, coalesce(u.nick_name, u.user_name, cast(d.create_by as varchar)) as label
+        from cm_document d left join sys_user u on u.user_id = d.create_by
+        where d.document_type = 'textbook' and d.del_flag = '0' and d.create_by is not null
+        <if test="visibleUserId != null">and d.create_by = #{visibleUserId}</if>
+        order by label
+    </select>
+    <select id="selectTextbook" resultMap="detailResult">
+        select d.id, d.syllabus_version_id, d.certification_id,
+               case when sv.id is null then null else concat(ec.certification_name, ' · ', sv.version_name) end as syllabus_version_name,
+               d.title, d.edition, d.status, d.create_by, coalesce(creator.nick_name, creator.user_name) as create_by_name,
+               d.create_time, d.update_time, coalesce(submitter.nick_name, submitter.user_name) as submitted_by_name,
+               d.submitted_time, coalesce(reviewer.nick_name, reviewer.user_name) as reviewed_by_name, d.reviewed_time,
+               d.review_comment, coalesce(publisher.nick_name, publisher.user_name) as published_by_name, d.published_time,
+               coalesce(stats.chunk_count, 0) as chunk_count, coalesce(stats.mapped_chunk_count, 0) as mapped_chunk_count,
+               coalesce(stats.unmapped_chunk_count, 0) as unmapped_chunk_count,
+               coalesce(stats.knowledge_point_count, 0) as knowledge_point_count,
+               coalesce(stats.image_count, 0) as image_count, latest.id as latest_import_batch_id,
+               latest.source_file_name, latest.source_file_size, latest.source_file_hash,
+               latest.status as latest_import_status, latest.valid_count, latest.warning_count, latest.failed_count,
+               latest.create_time as latest_import_create_time, latest.finished_time as latest_import_finished_time
+        from cm_document d join cm_exam_certification ec on ec.id = d.certification_id
+        left join cm_syllabus_version sv on sv.id = d.syllabus_version_id
+        left join sys_user creator on creator.user_id = d.create_by
+        left join sys_user submitter on submitter.user_id = d.submitted_by
+        left join sys_user reviewer on reviewer.user_id = d.reviewed_by
+        left join sys_user publisher on publisher.user_id = d.published_by
+        <include refid="statisticsJoins"/>
+        where d.id = #{id} and d.document_type = 'textbook' and d.del_flag = '0'
+        <if test="visibleUserId != null">and d.create_by = #{visibleUserId}</if>
+    </select>
+    <select id="lockTextbook" resultType="long">
+        select id from cm_document where id = #{id} and document_type = 'textbook' and del_flag = '0'
+        <if test="visibleUserId != null">and create_by = #{visibleUserId}</if> for update
+    </select>
+    <select id="selectActiveCertification" resultType="long">
+        select id from cm_exam_certification where id = #{certificationId} and status = '0'
+    </select>
+    <select id="countTextbookKnowledgeMappings" resultType="long">
+        select count(*) from cm_chunk_knowledge ck
+        join cm_document_chunk chunk on chunk.id = ck.chunk_id
+        where chunk.document_id = #{documentId}
+    </select>
+    <update id="updateTextbook">
+        update cm_document
+        set title = #{title}, certification_id = #{certificationId},
+            syllabus_version_id = case when #{clearSyllabusVersion} then null else syllabus_version_id end,
+            update_by = #{userId}, update_time = now()
+        where id = #{id} and document_type = 'textbook' and del_flag = '0'
+    </update>
+    <update id="publishTextbook">
+        update cm_document
+        set status = 'published', published_by = #{userId}, published_time = now(),
+            update_by = #{userId}, update_time = now()
+        where id = #{id} and document_type = 'textbook' and del_flag = '0' and status = 'draft'
+    </update>
+    <update id="takeTextbookOffline">
+        update cm_document
+        set status = 'draft', published_by = null, published_time = null,
+            update_by = #{userId}, update_time = now()
+        where id = #{id} and document_type = 'textbook' and del_flag = '0' and status = 'published'
+    </update>
+    <select id="selectKnowledgeScope" resultType="org.dromara.certmuse.catalog.domain.TextbookRows$Scope">
+        select syllabus_version_id, exam_subject_id from cm_knowledge_point where id = #{knowledgePointId} and del_flag = '0'
+    </select>
+    <select id="selectSubjectSyllabus" resultType="long">
+        select es.id from cm_document d
+        join cm_exam_subject es on es.certification_id = d.certification_id
+        where d.id = #{documentId} and es.id = #{examSubjectId}
+    </select>
+
+    <sql id="chunkScope">
+        <choose>
+            <when test="knowledgePointId != null and includeDescendants">
+                and exists (
+                    with recursive descendants as (
+                        select id from cm_knowledge_point where id = #{knowledgePointId} and del_flag = '0'
+                        union all
+                        select child.id from cm_knowledge_point child join descendants parent on child.parent_id = parent.id
+                        where child.del_flag = '0'
+                    )
+                    select 1 from cm_chunk_knowledge ck join descendants target on target.id = ck.knowledge_point_id
+                    where ck.chunk_id = c.id
+                )
+            </when>
+            <when test="knowledgePointId != null">
+                and exists (select 1 from cm_chunk_knowledge ck where ck.chunk_id = c.id and ck.knowledge_point_id = #{knowledgePointId})
+            </when>
+            <otherwise>
+                and exists (select 1 from cm_chunk_knowledge ck join cm_knowledge_point kp on kp.id = ck.knowledge_point_id
+                    where ck.chunk_id = c.id and kp.exam_subject_id = #{examSubjectId} and kp.del_flag = '0')
+            </otherwise>
+        </choose>
+        <if test="hasKnowledgePoint != null">
+            <choose>
+                <when test="hasKnowledgePoint">and exists (select 1 from cm_chunk_knowledge ck where ck.chunk_id = c.id)</when>
+                <otherwise>and not exists (select 1 from cm_chunk_knowledge ck where ck.chunk_id = c.id)</otherwise>
+            </choose>
+        </if>
+        <if test="keyword != null">and (c.heading ilike concat('%', #{keyword}, '%') or c.content ilike concat('%', #{keyword}, '%'))</if>
+    </sql>
+    <sql id="chunkSelectColumns">
+        c.id, c.document_id, c.chunk_order, c.heading, c.content, c.heading_path::text as heading_path,
+        c.source_locator::text as source_locator, c.content_hash,
+        coalesce(points.value, '[]'::jsonb)::text as knowledge_points, c.update_time, d.status as document_status
+    </sql>
+    <sql id="chunkJoins">
+        join cm_document d on d.id = c.document_id and d.document_type = 'textbook' and d.del_flag = '0'
+        left join lateral (
+            select jsonb_agg(jsonb_build_object(
+                'id', cast(kp.id as varchar),
+                'subjectNo', case es.subject_code when 'COMPREHENSIVE' then 1 when 'CASE_ANALYSIS' then 2 when 'ESSAY' then 3 else null end,
+                'code', kp.syllabus_number, 'title', kp.syllabus_title
+            ) order by kp.id) as value
+            from cm_chunk_knowledge ck join cm_knowledge_point kp on kp.id = ck.knowledge_point_id and kp.del_flag = '0'
+            join cm_exam_subject es on es.id = kp.exam_subject_id where ck.chunk_id = c.id
+        ) points on true
+    </sql>
+    <select id="selectChunks" resultMap="chunkResult">
+        select <include refid="chunkSelectColumns"/> from cm_document_chunk c <include refid="chunkJoins"/>
+        where c.document_id = #{documentId} <include refid="chunkScope"/>
+        order by c.chunk_order asc limit #{limit} offset #{offset}
+    </select>
+    <select id="countChunks" resultType="long">
+        select count(*) from cm_document_chunk c where c.document_id = #{documentId} <include refid="chunkScope"/>
+    </select>
+    <select id="selectChunk" resultMap="chunkResult">
+        select <include refid="chunkSelectColumns"/> from cm_document_chunk c <include refid="chunkJoins"/>
+        where c.document_id = #{documentId} and c.id = #{chunkId}
+    </select>
+    <update id="updateChunk">
+        update cm_document_chunk set heading = #{heading}, content = #{content}, content_hash = #{contentHash},
+            update_by = #{userId}, update_time = now()
+        where id = #{chunkId} and document_id = #{documentId} and update_time = #{updateTime}
+    </update>
+    <select id="countKnowledgePoints" resultType="long">
+        select count(*) from cm_knowledge_point
+        where syllabus_version_id = #{syllabusVersionId} and del_flag = '0' and id in
+        <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </select>
+    <delete id="deleteChunkKnowledgeByChunk">
+        delete from cm_chunk_knowledge where chunk_id = #{chunkId}
+    </delete>
+    <insert id="insertChunkKnowledge">
+        insert into cm_chunk_knowledge(id, chunk_id, knowledge_point_id)
+        values <foreach collection="rows" item="row" separator=",">(#{row.id}, #{row.chunkId}, #{row.knowledgePointId})</foreach>
+    </insert>
+    <select id="countChunksForDelete" resultType="long">
+        select count(*) from cm_document_chunk where document_id = #{documentId} and id in
+        <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </select>
+    <delete id="deleteImages">
+        delete from cm_document_image where chunk_id in (select id from cm_document_chunk
+        where document_id = #{documentId} and id in
+        <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>)
+    </delete>
+    <delete id="deleteChunkKnowledge">
+        delete from cm_chunk_knowledge where chunk_id in (select id from cm_document_chunk
+        where document_id = #{documentId} and id in
+        <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>)
+    </delete>
+    <delete id="deleteChunks">
+        delete from cm_document_chunk where document_id = #{documentId} and id in
+        <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </delete>
+    <update id="softDeleteTextbook">
+        update cm_document set del_flag = '1', update_by = #{userId}, update_time = now()
+        where id = #{id} and document_type = 'textbook' and del_flag = '0'
+    </update>
+</mapper>

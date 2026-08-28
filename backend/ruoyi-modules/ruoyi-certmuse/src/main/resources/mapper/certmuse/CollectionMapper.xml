@@ -1,0 +1,228 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.dromara.certmuse.question.mapper.CollectionMapper">
+    <sql id="collectionFilters">
+        1=1
+        <if test="query.keyword != null">and (c.collection_code ilike concat('%',#{query.keyword},'%') or r.collection_name ilike concat('%',#{query.keyword},'%'))</if>
+        <if test="query.collectionType != null">and r.collection_type=#{query.collectionType}</if>
+        <if test="certificationId != null">and r.certification_id=#{certificationId}</if>
+        <if test="syllabusVersionId != null">and r.syllabus_version_id=#{syllabusVersionId}</if>
+        <if test="query.status != null">and r.status=#{query.status}</if>
+    </sql>
+    <select id="selectCollections" resultType="org.dromara.certmuse.question.domain.CollectionListRow">
+        select cast(c.id as varchar) collection_id, c.collection_code,
+               cast(r.id as varchar) revision_id, r.revision_no, r.collection_name, r.collection_type,
+               cast(r.certification_id as varchar) certification_id, ec.certification_name,
+               cast(r.syllabus_version_id as varchar) syllabus_version_id, sv.version_name syllabus_version_name,
+               r.status,
+               (cur.collection_revision_id=r.id) current_published,
+               (r.status='rejected' and nullif(btrim(r.review_opinion),'') is not null) has_review_opinion,
+               r.row_version, r.question_count, r.total_report_score, r.duration_minutes, r.update_time updated_time
+          from cm_collection c join cm_collection_revision r on r.collection_id=c.id
+          join cm_exam_certification ec on ec.id=r.certification_id
+          join cm_syllabus_version sv on sv.id=r.syllabus_version_id
+          left join cm_collection_current cur on cur.collection_id=c.id
+          where <include refid="collectionFilters"/>
+          order by case
+                     when r.status='rejected' then 0
+                     when r.status='published' and cur.collection_revision_id=r.id then 1
+                     when r.status='pending_review' then 2
+                     else 3
+                   end, r.revision_no desc, r.id desc limit #{limit} offset #{offset}
+    </select>
+    <select id="countCollections" resultType="long">
+        select count(*) from cm_collection c join cm_collection_revision r on r.collection_id=c.id
+         where <include refid="collectionFilters"/>
+    </select>
+    <sql id="managedCollectionFilters">
+        1=1
+        <if test="query.keyword != null">and (c.collection_code ilike concat('%',#{query.keyword},'%') or c.collection_name ilike concat('%',#{query.keyword},'%'))</if>
+        <if test="query.collectionType != null">and r.collection_type=#{query.collectionType}</if>
+        <if test="certificationId != null">and r.certification_id=#{certificationId}</if>
+        <if test="syllabusVersionId != null">and r.syllabus_version_id=#{syllabusVersionId}</if>
+        <if test="query.status != null">and r.status=#{query.status}</if>
+        <if test="query.statuses != null and !query.statuses.isEmpty()">
+            and (
+            <foreach collection="query.statuses" item="displayStatus" separator=" or ">
+                <choose>
+                    <when test="displayStatus == 'rejected'">r.status='rejected'</when>
+                    <when test="displayStatus == 'draft'">r.status='draft'</when>
+                    <otherwise>r.status=#{displayStatus}</otherwise>
+                </choose>
+            </foreach>
+            )
+        </if>
+    </sql>
+    <select id="selectManagedCollectionIds" resultType="long">
+        select c.id from cm_collection c join cm_collection_revision r on r.collection_id=c.id
+        where <include refid="managedCollectionFilters"/>
+        group by c.id
+        order by min(case
+                     when r.status='rejected' then 0
+                     when r.status='published' then 1
+                     when r.status='pending_review' then 2
+                     else 3
+                   end), greatest(max(c.update_time), max(r.update_time)) desc, c.id desc
+        limit #{limit} offset #{offset}
+    </select>
+    <select id="countManagedCollections" resultType="long">
+        select count(distinct c.id) from cm_collection c join cm_collection_revision r on r.collection_id=c.id
+        where <include refid="managedCollectionFilters"/>
+    </select>
+    <select id="selectManagedCollectionRevisions" resultType="org.dromara.certmuse.question.domain.CollectionListRow">
+        select cast(c.id as varchar) collection_id, c.collection_code,
+               c.collection_name parent_collection_name, c.update_time collection_updated_time,
+               cast(r.id as varchar) revision_id, r.revision_no, r.collection_name, r.collection_type,
+               cast(r.certification_id as varchar) certification_id, ec.certification_name,
+               cast(r.syllabus_version_id as varchar) syllabus_version_id, sv.version_name syllabus_version_name,
+               r.status,
+               (cur.collection_revision_id=r.id) current_published,
+               (r.status='rejected' and nullif(btrim(r.review_opinion),'') is not null) has_review_opinion,
+               r.row_version, r.question_count, r.total_report_score, r.duration_minutes, r.update_time updated_time
+          from cm_collection c join cm_collection_revision r on r.collection_id=c.id
+          join cm_exam_certification ec on ec.id=r.certification_id
+          join cm_syllabus_version sv on sv.id=r.syllabus_version_id
+          left join cm_collection_current cur on cur.collection_id=c.id
+         where c.id in <foreach collection="collectionIds" item="collectionId" open="(" separator="," close=")">#{collectionId}</foreach>
+         order by array_position(array[<foreach collection="collectionIds" item="collectionId" separator=",">#{collectionId}</foreach>]::bigint[], c.id),
+                  case when r.status='rejected' then 0
+                       when r.status='published' then 1 when r.status='pending_review' then 2 else 3 end,
+                  r.revision_no desc, r.id desc
+    </select>
+    <sql id="revisionColumns">
+        r.id, r.collection_id, c.collection_code, r.revision_no, r.status, r.row_version,
+        r.collection_name, r.collection_type, r.certification_id, ec.certification_name,
+        r.syllabus_version_id, sv.version_name syllabus_version_name, r.question_count,
+        r.total_report_score, r.duration_minutes, r.pause_allowed, r.review_opinion,
+        r.update_time updated_time
+    </sql>
+    <select id="selectRevision" resultType="org.dromara.certmuse.question.domain.CollectionRevisionRow">
+        select <include refid="revisionColumns"/> from cm_collection_revision r
+        join cm_collection c on c.id=r.collection_id join cm_exam_certification ec on ec.id=r.certification_id
+        join cm_syllabus_version sv on sv.id=r.syllabus_version_id where r.id=#{revisionId}
+    </select>
+    <select id="lockRevision" resultType="org.dromara.certmuse.question.domain.CollectionRevisionRow">
+        select <include refid="revisionColumns"/> from cm_collection_revision r
+        join cm_collection c on c.id=r.collection_id join cm_exam_certification ec on ec.id=r.certification_id
+        join cm_syllabus_version sv on sv.id=r.syllabus_version_id where r.id=#{revisionId} for update of r
+    </select>
+    <select id="selectDisplayRevision" resultType="org.dromara.certmuse.question.domain.CollectionRevisionRow">
+        select <include refid="revisionColumns"/> from cm_collection_revision r
+        join cm_collection c on c.id=r.collection_id join cm_exam_certification ec on ec.id=r.certification_id
+        join cm_syllabus_version sv on sv.id=r.syllabus_version_id
+        left join cm_collection_current cur on cur.collection_id=r.collection_id
+        where r.collection_id=#{collectionId}
+        order by case when r.status in ('draft','pending_review','rejected') then 0
+                      when r.id=cur.collection_revision_id then 1 else 2 end,
+        r.revision_no desc limit 1
+    </select>
+    <select id="selectCurrentPublished" resultType="org.dromara.certmuse.question.domain.CollectionRevisionRow">
+        select <include refid="revisionColumns"/> from cm_collection_current cur
+        join cm_collection_revision r on r.id=cur.collection_revision_id join cm_collection c on c.id=r.collection_id
+        join cm_exam_certification ec on ec.id=r.certification_id join cm_syllabus_version sv on sv.id=r.syllabus_version_id
+        where cur.collection_id=#{collectionId} and r.status='published'
+    </select>
+    <select id="selectPendingReviewRevision" resultType="org.dromara.certmuse.question.domain.CollectionRevisionRow">
+        select <include refid="revisionColumns"/> from cm_collection_revision r
+        join cm_collection c on c.id=r.collection_id join cm_exam_certification ec on ec.id=r.certification_id
+        join cm_syllabus_version sv on sv.id=r.syllabus_version_id
+        where r.collection_id=#{collectionId} and r.status='pending_review' limit 1
+    </select>
+    <select id="lockCurrentPublished" resultType="org.dromara.certmuse.question.domain.CollectionRevisionRow">
+        select <include refid="revisionColumns"/> from cm_collection_current cur
+        join cm_collection_revision r on r.id=cur.collection_revision_id join cm_collection c on c.id=r.collection_id
+        join cm_exam_certification ec on ec.id=r.certification_id join cm_syllabus_version sv on sv.id=r.syllabus_version_id
+        where cur.collection_id=#{collectionId} and r.status='published' for update of r
+    </select>
+    <select id="lockPublishedRevisions" resultType="org.dromara.certmuse.question.domain.CollectionRevisionRow">
+        select <include refid="revisionColumns"/> from cm_collection_revision r
+        join cm_collection c on c.id=r.collection_id join cm_exam_certification ec on ec.id=r.certification_id
+        join cm_syllabus_version sv on sv.id=r.syllabus_version_id
+        where r.collection_id=#{collectionId} and r.status='published' order by r.id for update of r
+    </select>
+    <select id="lockPendingRevisionsByQuestionRevision" resultType="org.dromara.certmuse.question.domain.CollectionRevisionRow">
+        select <include refid="revisionColumns"/> from cm_collection_item i
+        join cm_collection_revision r on r.id=i.collection_revision_id
+        join cm_collection c on c.id=r.collection_id join cm_exam_certification ec on ec.id=r.certification_id
+        join cm_syllabus_version sv on sv.id=r.syllabus_version_id
+        where i.question_revision_id=#{questionRevisionId} and r.status='pending_review'
+        order by r.id for update of r
+    </select>
+    <select id="selectRevisions" resultType="org.dromara.certmuse.question.domain.CollectionRevisionRow">
+        select <include refid="revisionColumns"/> from cm_collection_revision r
+        join cm_collection c on c.id=r.collection_id join cm_exam_certification ec on ec.id=r.certification_id
+        join cm_syllabus_version sv on sv.id=r.syllabus_version_id where r.collection_id=#{collectionId}
+        order by r.revision_no desc
+    </select>
+    <sql id="itemColumns">
+        i.item_order, i.question_revision_id, qr.question_id, q.question_code, qr.stem,
+        qr.question_type, qr.difficulty, qr.status, q.exam_subject_id, es.subject_name exam_subject_name,
+        kp.id knowledge_point_id, concat(kp.syllabus_number,' ',kp.syllabus_title) knowledge_point_label,
+        i.report_score, cast(i.answer_schema as text) answer_schema, qr.estimated_seconds, es.certification_id,
+        kp.syllabus_version_id, (select count(*) from cm_question_knowledge qk left join cm_knowledge_point qkp on qkp.id=qk.knowledge_point_id
+          where qk.question_revision_id=qr.id and (qkp.id is null or qkp.del_flag&lt;&gt;'0'
+            or exists (select 1 from cm_knowledge_point child where child.parent_id=qkp.id and child.del_flag='0'))) invalid_knowledge_count
+        ,(select count(*) from cm_question_knowledge qk join cm_knowledge_point qkp on qkp.id=qk.knowledge_point_id
+          where qk.question_revision_id=qr.id and qkp.del_flag='0'
+            and not exists (select 1 from cm_knowledge_point child where child.parent_id=qkp.id and child.del_flag='0')
+            and (qkp.importance is null or qkp.importance not in (1,2,3))) missing_leaf_importance_count
+    </sql>
+    <select id="selectItems" resultType="org.dromara.certmuse.question.domain.CollectionItemRow">
+        select <include refid="itemColumns"/> from cm_collection_item i
+        join cm_question_revision qr on qr.id=i.question_revision_id join cm_question q on q.id=qr.question_id
+        join cm_exam_subject es on es.id=q.exam_subject_id
+        left join lateral (select kp.* from cm_question_knowledge qk join cm_knowledge_point kp on kp.id=qk.knowledge_point_id
+          where qk.question_revision_id=qr.id order by case qk.relation_role when 'primary' then 0 else 1 end, qk.sort_order limit 1) kp on true
+        where i.collection_revision_id=#{revisionId} order by i.item_order
+    </select>
+    <select id="selectQuestionRevisionMetadata" resultType="org.dromara.certmuse.question.domain.CollectionItemRow">
+        select 0 item_order, qr.id question_revision_id, qr.question_id, q.question_code, qr.stem,
+        qr.question_type, qr.difficulty, qr.status, q.exam_subject_id, es.subject_name exam_subject_name,
+        kp.id knowledge_point_id, concat(kp.syllabus_number,' ',kp.syllabus_title) knowledge_point_label,
+        cast(qr.answer as text) answer_schema, qr.estimated_seconds, es.certification_id, kp.syllabus_version_id,
+        (select count(*) from cm_question_knowledge qk left join cm_knowledge_point qkp on qkp.id=qk.knowledge_point_id
+          where qk.question_revision_id=qr.id and (qkp.id is null or qkp.del_flag&lt;&gt;'0'
+            or exists (select 1 from cm_knowledge_point child where child.parent_id=qkp.id and child.del_flag='0'))) invalid_knowledge_count
+        ,(select count(*) from cm_question_knowledge qk join cm_knowledge_point qkp on qkp.id=qk.knowledge_point_id
+          where qk.question_revision_id=qr.id and qkp.del_flag='0'
+            and not exists (select 1 from cm_knowledge_point child where child.parent_id=qkp.id and child.del_flag='0')
+            and qkp.importance not in (1,2,3)) missing_leaf_importance_count
+        from cm_question_revision qr join cm_question q on q.id=qr.question_id join cm_exam_subject es on es.id=q.exam_subject_id
+        left join lateral (select kp.* from cm_question_knowledge qk join cm_knowledge_point kp on kp.id=qk.knowledge_point_id
+          where qk.question_revision_id=qr.id order by case qk.relation_role when 'primary' then 0 else 1 end, qk.sort_order limit 1) kp on true
+        where qr.id in <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+        and q.del_flag='0'
+        <if test="visibleUserId != null">and q.create_by=#{visibleUserId}</if>
+    </select>
+    <select id="lockCollection" resultType="long">select id from cm_collection where id=#{collectionId} for update</select>
+    <select id="lockDraftRevisionForRename" resultType="long">
+        select id from cm_collection_revision
+        where collection_id=#{collectionId} and status='draft'
+        order by revision_no desc, id desc limit 1 for update
+    </select>
+    <update id="updateCollectionName">update cm_collection set collection_name=#{name},update_time=now() where id=#{collectionId}</update>
+    <select id="countCertification" resultType="int">select count(*) from cm_exam_certification where id=#{certificationId}</select>
+    <select id="countSyllabusInCertification" resultType="int">select count(*) from cm_syllabus_version where id=#{syllabusId} and certification_id=#{certificationId}</select>
+    <select id="selectActiveSubjectIds" resultType="long">select id from cm_exam_subject where certification_id=#{certificationId} order by id</select>
+    <select id="nextRevisionNo" resultType="int">select coalesce(max(revision_no),0)+1 from cm_collection_revision where collection_id=#{collectionId}</select>
+    <insert id="insertCollection">insert into cm_collection(id,certification_id,syllabus_version_id,collection_code,collection_name,collection_type,status,exam_year,exam_month,paper_type_code,paper_type_name) values(#{id},#{certificationId},#{syllabusVersionId},#{code},#{name},#{type},'0',#{examYear},#{examMonth},#{paperTypeCode},#{paperTypeName})</insert>
+    <update id="updatePastPaperMetadata">update cm_collection set exam_year=#{examYear},exam_month=#{examMonth},paper_type_code=#{paperTypeCode},paper_type_name=#{paperTypeName},update_time=now() where id=#{collectionId} and collection_type=#{type}</update>
+    <insert id="insertRevision">insert into cm_collection_revision(id,collection_id,revision_no,status,row_version,collection_name,collection_type,certification_id,syllabus_version_id,question_count,total_report_score,duration_minutes,pause_allowed) values(#{id},#{collectionId},#{revisionNo},'draft',0,#{name},#{type},#{certificationId},#{syllabusVersionId},#{questionCount},#{totalScore},#{durationMinutes},true)</insert>
+    <update id="updateDraft">update cm_collection_revision set collection_name=#{name},collection_type=#{type},certification_id=#{certificationId},syllabus_version_id=#{syllabusVersionId},duration_minutes=#{durationMinutes},question_count=#{questionCount},total_report_score=#{totalScore},row_version=row_version+1,update_time=now() where id=#{revisionId} and status in ('draft','rejected') and row_version=#{rowVersion}</update>
+    <delete id="deleteItems">delete from cm_collection_item where collection_revision_id=#{revisionId}</delete>
+    <delete id="deleteDraftRevision">delete from cm_collection_revision where id=#{revisionId} and status in ('draft','rejected')</delete>
+    <select id="countRevisions" resultType="int">select count(*) from cm_collection_revision where collection_id=#{collectionId}</select>
+    <delete id="deleteCollection">delete from cm_collection where id=#{collectionId}</delete>
+    <insert id="insertItem">insert into cm_collection_item(id,collection_revision_id,question_revision_id,item_order,report_score,answer_schema) values(#{id},#{revisionId},#{questionRevisionId},#{itemOrder},#{reportScore},cast(#{answerSchema} as jsonb))</insert>
+    <update id="markSubmitted">update cm_collection_revision set status='pending_review',submitted_by=#{userId},submitted_time=now(),review_opinion=null,row_version=row_version+1,update_time=now() where id=#{revisionId} and status in ('draft','rejected')</update>
+    <update id="markRejected">update cm_collection_revision set status='rejected',reviewed_by=#{userId},reviewed_time=now(),review_opinion=#{opinion},row_version=row_version+1,update_time=now() where id=#{revisionId} and status='pending_review'</update>
+    <update id="markPublished">update cm_collection_revision set status='published',reviewed_by=#{userId},reviewed_time=now(),published_by=#{userId},published_time=now(),review_opinion=null,row_version=row_version+1,update_time=now() where id=#{revisionId} and status='pending_review'</update>
+    <update id="markPublishedAsDraft">update cm_collection_revision set status='draft',row_version=row_version+1,update_time=now() where id=#{revisionId} and status='published'</update>
+    <insert id="upsertCurrent">insert into cm_collection_current(collection_id,collection_revision_id,purpose_code,effective_time,update_time) values(#{collectionId},#{revisionId},'LEARNING',now(),now()) on conflict(collection_id) do update set collection_revision_id=excluded.collection_revision_id,effective_time=excluded.effective_time,update_time=now()</insert>
+    <delete id="deleteCurrent">delete from cm_collection_current where collection_id=#{collectionId} and collection_revision_id=#{revisionId}</delete>
+    <insert id="insertAudit">insert into cm_business_audit_log(id,operator_id,domain_code,action_code,target_type,target_id,before_data,after_data,trace_id) values(#{id},#{operatorId},'question',#{action},'collection_revision',#{revisionId},cast(#{beforeData} as jsonb),cast(#{afterData} as jsonb),#{traceId})</insert>
+    <select id="selectIdempotency" resultType="org.dromara.certmuse.question.domain.CollectionIdempotencyRow">select id,payload_hash,status,resource_id,cast(response_body as text) response_body from cm_idempotency_record where action_code=#{action} and request_id=#{requestId}</select>
+    <insert id="insertIdempotency">insert into cm_idempotency_record(id,action_code,request_id,payload_hash,status,resource_type,resource_id,expires_time) values(#{id},#{action},#{requestId},#{payloadHash},'processing','collection',#{resourceId},#{expiresTime}) on conflict do nothing</insert>
+    <update id="completeIdempotency">update cm_idempotency_record set status='succeeded',resource_id=#{resourceId},response_status=#{responseStatus},response_body=cast(#{responseBody} as jsonb),update_time=now() where id=#{id}</update>
+    <insert id="insertReviewAudit">insert into cm_business_audit_log(id,operator_id,domain_code,action_code,target_type,target_id,before_data,after_data,trace_id) values(#{id},#{userId},'collection',#{action},'collection_revision',#{revisionId},cast(#{beforeData} as jsonb),cast(#{afterData} as jsonb),#{traceId})</insert>
+</mapper>

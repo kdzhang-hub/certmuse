@@ -1,0 +1,44 @@
+name: Bug report
+description: Report a reproducible problem in the public source release.
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for taking the time to help improve CertMuse. Do not include credentials, private keys, user data, private documents, or examination content.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Describe the observed behavior and its impact.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: How can we reproduce it?
+      description: Give the smallest safe reproduction using only public information.
+      placeholder: |
+        1. Go to ...
+        2. Run ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+    validations:
+      required: true
+  - type: input
+    id: revision
+    attributes:
+      label: Public revision or commit
+      description: Include the commit SHA or release tag if known.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Safety check
+      options:
+        - label: I have removed credentials, personal data, private documents, and examination material from this report.
+          required: true

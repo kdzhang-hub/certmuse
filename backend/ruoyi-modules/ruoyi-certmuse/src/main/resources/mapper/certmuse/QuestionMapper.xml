@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.dromara.certmuse.question.mapper.QuestionMapper">
+    <select id="selectInvalidPublishedRevisions" resultType="org.dromara.certmuse.question.domain.QuestionKnowledgeMaintenanceRow">
+        select distinct qr.question_id, qr.id as revision_id
+        from cm_question_revision qr
+        where qr.status='published'
+          and exists (
+              select 1 from cm_question_knowledge qk
+              where qk.question_revision_id=qr.id
+                and qk.knowledge_point_id in
+                <foreach collection="deletedKnowledgePointIds" item="id" open="(" close=")" separator=",">#{id}</foreach>
+          )
+          and (
+              (select count(*) from cm_question_knowledge qk
+               join cm_knowledge_point kp on kp.id=qk.knowledge_point_id and kp.del_flag='0'
+               where qk.question_revision_id=qr.id)=0
+              or (select count(*) from cm_question_knowledge qk
+                  join cm_knowledge_point kp on kp.id=qk.knowledge_point_id and kp.del_flag='0'
+                  where qk.question_revision_id=qr.id and qk.relation_role='primary')&lt;&gt;1
+          )
+        order by qr.id
+    </select>
+    <update id="batchReturnKnowledgeInvalidRevisionsToDraft">
+        update cm_question_revision qr set status='draft',row_version=row_version+1,
+            review_opinion=null,published_by=null,published_time=null,
+            update_by=#{operatorId},update_time=now()
+        from (values
+        <foreach collection="rows" item="row" separator=",">(#{row.revisionId}::bigint)</foreach>
+        ) as v(revision_id)
+        where qr.id=v.revision_id and qr.status='published'
+    </update>
+    <insert id="insertKnowledgeInvalidRevisionEvents">
+        insert into cm_question_revision_event(
+            id,question_id,question_revision_id,event_type,from_status,to_status,opinion,operator_id,request_id,trace_id
+        ) values
+        <foreach collection="rows" item="row" separator=",">
+            (#{row.eventId},#{row.questionId},#{row.revisionId},'question_offline','published','draft',
+             '考纲更新导致知识点关联失效',#{row.operatorId},#{row.requestId},#{row.traceId})
+        </foreach>
+    </insert>
+    <insert id="insertKnowledgeInvalidAudits">
+        insert into cm_business_audit_log(
+            id,operator_id,domain_code,action_code,target_type,target_id,before_data,after_data,trace_id
+        ) values
+        <foreach collection="rows" item="row" separator=",">
+            (#{row.auditId},#{row.operatorId},'question','question_offline','question_revision',#{row.revisionId},
+             jsonb_build_object('schema_version','question_review_audit/1.0','status','published'),
+             jsonb_build_object('schema_version','question_review_audit/1.0','status','draft',
+                 'reason','考纲更新导致知识点关联失效','request_id',#{row.requestId}),#{row.traceId})
+        </foreach>
+    </insert>
+    <sql id="rankedQuestions">
+        with ranked as (
+      select q.question_code, q.exam_subject_id, q.create_by, r.*, 
+                   row_number() over (partition by q.id order by
+                     case when r.status in ('draft','pending_review','rejected') then 0
+                          when r.status='published' then 1 else 2 end,
+                     r.revision_no desc) display_rank
+              from cm_question q join cm_question_revision r on r.question_id=q.id
+             where q.del_flag='0'
+               <if test="visibleUserId != null">and q.create_by=#{visibleUserId}</if>
+        )
+    </sql>
+    <sql id="questionFilters">
+        rr.display_rank=1
+        <if test="query.keyword != null">and (rr.question_code ilike concat('%',#{query.keyword},'%') or rr.stem ilike concat('%',#{query.keyword},'%'))</if>
+        <if test="query.questionType != null">and rr.question_type=#{query.questionType}</if>
+        <if test="query.difficulty != null">and rr.difficulty=#{query.difficulty}</if>
+        <if test="query.status != null">and rr.status=#{query.status}</if>
+        <if test="certificationId != null">and exists (select 1 from cm_exam_subject es where es.id=rr.exam_subject_id and es.certification_id=#{certificationId})</if>
+        <if test="subjectId != null">and rr.exam_subject_id=#{subjectId}</if>
+        <if test="syllabusId != null">
+          and exists (select 1 from cm_question_knowledge qk join cm_knowledge_point kp on kp.id=qk.knowledge_point_id
+                       where qk.question_revision_id=rr.id and kp.del_flag='0' and kp.syllabus_version_id=#{syllabusId})
+        </if>
+        <if test="knowledgeId != null">
+          and exists (
+            with recursive descendants(id) as (
+              select #{knowledgeId}::bigint
+              <if test="query.includeDescendants == null or query.includeDescendants">
+              union all select child.id from cm_knowledge_point child join descendants d on child.parent_id=d.id where child.del_flag='0'
+              </if>
+            )
+            select 1 from cm_question_knowledge qk join descendants d on d.id=qk.knowledge_point_id
+             where qk.question_revision_id=rr.id
+          )
+        </if>
+    </sql>
+
+    <select id="selectQuestions" resultType="org.dromara.certmuse.question.domain.QuestionRows$ListItem">
+        <include refid="rankedQuestions"/>
+        select cast(rr.question_id as varchar) question_id, cast(rr.id as varchar) revision_id,
+               rr.revision_no, rr.question_code,
+               cast(scope.syllabus_version_id as varchar) syllabus_version_id,
+               case when sv.id is null then null else concat(ec.certification_name, ' - ', sv.version_name) end syllabus_version_name,
+               rr.stem stem_summary,
+               cast(rr.exam_subject_id as varchar) exam_subject_id, es.subject_name exam_subject_name,
+               rr.question_type, rr.difficulty, rr.status,
+               (rr.review_opinion is not null and btrim(rr.review_opinion) &lt;&gt; '') has_review_opinion,
+               rr.update_time updated_time
+          from ranked rr
+          join cm_exam_subject es on es.id=rr.exam_subject_id
+          left join lateral (select min(kp.syllabus_version_id) syllabus_version_id from cm_question_knowledge qk
+                              join cm_knowledge_point kp on kp.id=qk.knowledge_point_id where qk.question_revision_id=rr.id) scope on true
+          left join cm_syllabus_version sv on sv.id=scope.syllabus_version_id
+          join cm_exam_certification ec on ec.id=es.certification_id
+         where <include refid="questionFilters"/>
+         order by case rr.status
+                    when 'rejected' then 1
+                    when 'pending_review' then 2
+                    when 'published' then 3
+                    when 'draft' then 4
+                    else 5
+                   end,
+                  rr.update_time desc, rr.question_id desc limit #{limit} offset #{offset}
+    </select>
+    <select id="countQuestions" resultType="long">
+        <include refid="rankedQuestions"/>
+        select count(*) from ranked rr where <include refid="questionFilters"/>
+    </select>
+
+    <sql id="revisionColumns">
+        q.id question_id, r.id revision_id, r.revision_no, r.row_version, q.question_code,
+        q.exam_subject_id, es.subject_name exam_subject_name, es.certification_id,
+        ec.certification_name, r.question_type, r.difficulty, r.estimated_seconds, r.stem,
+        cast(r.answer as text) answer, r.analysis, r.common_mistakes, r.status, r.review_opinion,
+        r.update_time updated_time,
+        q.create_by, q.create_dept, r.content_hash, r.source_type, r.source_name, r.source_external_id,
+        r.source_locator, r.authorization_status, r.authorization_note, r.knowledge_mapping_status
+    </sql>
+    <select id="selectRevision" resultType="org.dromara.certmuse.question.domain.QuestionRows$Revision">
+        <if test="revisionId == null"><include refid="rankedQuestions"/></if>
+        select <include refid="revisionColumns"/>
+          from cm_question q join cm_question_revision r on r.question_id=q.id
+          join cm_exam_subject es on es.id=q.exam_subject_id join cm_exam_certification ec on ec.id=es.certification_id
+         where q.id=#{questionId} and q.del_flag='0'
+           <if test="revisionId != null">and r.id=#{revisionId}</if>
+           <if test="revisionId == null">and r.id=(select id from ranked where question_id=#{questionId} and display_rank=1)</if>
+           <if test="visibleUserId != null">and q.create_by=#{visibleUserId}</if>
+    </select>
+    <select id="lockRevision" resultType="org.dromara.certmuse.question.domain.QuestionRows$Revision">
+        select <include refid="revisionColumns"/>
+          from cm_question q join cm_question_revision r on r.question_id=q.id
+          join cm_exam_subject es on es.id=q.exam_subject_id join cm_exam_certification ec on ec.id=es.certification_id
+         where q.id=#{questionId} and r.id=#{revisionId} and q.del_flag='0'
+           <if test="visibleUserId != null">and q.create_by=#{visibleUserId}</if> for update of q,r
+    </select>
+    <select id="lockReviewRevision" resultType="org.dromara.certmuse.question.domain.QuestionRows$Revision">
+        select <include refid="revisionColumns"/>
+          from cm_question q join cm_question_revision r on r.question_id=q.id
+          join cm_exam_subject es on es.id=q.exam_subject_id join cm_exam_certification ec on ec.id=es.certification_id
+         where r.id=#{revisionId} and q.del_flag='0'
+           <if test="visibleUserId != null">and q.create_by=#{visibleUserId}</if> for update of q,r
+    </select>
+    <select id="lockReviewRevisions" resultType="org.dromara.certmuse.question.domain.QuestionRows$Revision">
+        select <include refid="revisionColumns"/>
+          from cm_question q join cm_question_revision r on r.question_id=q.id
+          join cm_exam_subject es on es.id=q.exam_subject_id join cm_exam_certification ec on ec.id=es.certification_id
+         where r.id in <foreach collection="revisionIds" item="revisionId" open="(" separator="," close=")">#{revisionId}</foreach>
+           and q.del_flag='0'
+           <if test="visibleUserId != null">and q.create_by=#{visibleUserId}</if>
+         order by r.id for update of q,r
+    </select>
+    <select id="selectWorkingRevision" resultType="org.dromara.certmuse.question.domain.QuestionRows$Revision">
+        select <include refid="revisionColumns"/> from cm_question q join cm_question_revision r on r.question_id=q.id
+        join cm_exam_subject es on es.id=q.exam_subject_id join cm_exam_certification ec on ec.id=es.certification_id
+        where q.id=#{questionId} and r.status in ('draft','pending_review','rejected') limit 1
+    </select>
+    <select id="selectOptions" resultType="org.dromara.certmuse.question.domain.QuestionRows$Option">select id,option_label label,option_text content,sort_order from cm_question_option where question_revision_id=#{revisionId} order by sort_order</select>
+    <select id="selectImages" resultType="org.dromara.certmuse.question.domain.QuestionRows$Image">select id,image_order sort_order,source_url,alt_text alt,storage_path from cm_question_image where question_revision_id=#{revisionId} order by image_order</select>
+    <select id="selectKnowledge" resultType="org.dromara.certmuse.question.domain.QuestionRows$Knowledge">
+      select qk.knowledge_point_id,concat(kp.syllabus_number,' ',kp.syllabus_title) knowledge_point_label,qk.relation_role,qk.sort_order,kp.syllabus_version_id,kp.exam_subject_id,
+             not exists(select 1 from cm_knowledge_point c where c.parent_id=kp.id and c.del_flag='0') leaf
+      from cm_question_knowledge qk join cm_knowledge_point kp on kp.id=qk.knowledge_point_id where qk.question_revision_id=#{revisionId} order by qk.sort_order
+    </select>
+    <select id="selectExamSubjectOptions" resultType="org.dromara.certmuse.question.domain.QuestionRows$IdLabel">select cast(id as varchar) id,subject_name label from cm_exam_subject where certification_id=#{certificationId} order by subject_code</select>
+    <select id="selectSyllabusLabel" resultType="org.dromara.certmuse.question.domain.QuestionRows$IdLabel">select cast(sv.id as varchar) id,concat(ec.certification_name, chr(183), sv.version_name) label from cm_syllabus_version sv join cm_exam_certification ec on ec.id=sv.certification_id where sv.id=#{syllabusVersionId}</select>
+    <select id="selectKnowledgeMetadata" resultType="org.dromara.certmuse.question.domain.QuestionRows$Knowledge">
+      select kp.id knowledge_point_id,kp.syllabus_version_id,kp.exam_subject_id,not exists(select 1 from cm_knowledge_point c where c.parent_id=kp.id and c.del_flag='0') leaf
+      from cm_knowledge_point kp where kp.del_flag='0' and kp.id in <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </select>
+    <select id="countSubjectInSyllabus" resultType="int">select count(*) from cm_syllabus_version sv join cm_exam_subject es on es.certification_id=sv.certification_id where sv.id=#{syllabusId} and es.id=#{subjectId}</select>
+    <select id="countQuestionReferences" resultType="int">
+      select (select count(*) from cm_collection_item ci join cm_question_revision r on r.id=ci.question_revision_id where r.question_id=#{questionId})
+           + (select count(*) from cm_session_question where question_id=#{questionId})
+    </select>
+    <select id="countPublishedHistory" resultType="int">select count(*) from cm_question_revision where question_id=#{questionId} and status='published'</select>
+    <select id="countRevisions" resultType="int">select count(*) from cm_question_revision where question_id=#{questionId}</select>
+    <select id="nextRevisionNo" resultType="int">select coalesce(max(revision_no),0)+1 from cm_question_revision where question_id=#{questionId}</select>
+
+    <update id="updateRevision">update cm_question_revision set status=#{status},row_version=row_version+1,question_type=#{questionType},difficulty=#{difficulty},estimated_seconds=#{estimatedSeconds},stem=#{stem},answer=#{answer}::jsonb,analysis=#{analysis},common_mistakes=#{commonMistakes},content_hash=#{contentHash},semantic_hash=#{semanticHash},review_opinion=null,update_by=#{userId},update_time=now() where id=#{revisionId} and row_version=#{rowVersion}</update>
+    <update id="updateQuestionSubject">update cm_question set exam_subject_id=#{subjectId},update_by=#{userId},update_time=now() where id=#{questionId}</update>
+    <update id="markReviewSubmitted">update cm_question_revision set status='pending_review',row_version=row_version+1,review_opinion=null,update_by=#{userId},update_time=now() where id=#{revisionId} and status in ('draft','rejected')</update>
+    <update id="markReviewPublished">update cm_question_revision set status='published',row_version=row_version+1,reviewed_by=#{userId},reviewed_time=now(),review_opinion=null,published_by=#{userId},published_time=now(),update_by=#{userId},update_time=now() where id=#{revisionId} and status='pending_review'</update>
+    <update id="markReviewRejected">update cm_question_revision set status='rejected',row_version=row_version+1,reviewed_by=#{userId},reviewed_time=now(),review_opinion=#{opinion},update_by=#{userId},update_time=now() where id=#{revisionId} and status='pending_review'</update>
+    <update id="markPublishedDraft">update cm_question_revision set status='draft',row_version=row_version+1,review_opinion=null,published_by=null,published_time=null,update_by=#{userId},update_time=now() where id=#{revisionId} and status='published'</update>
+    <update id="softDeleteQuestion">update cm_question set del_flag='1',update_by=#{userId},update_time=now() where id=#{questionId} and del_flag='0'</update>
+    <insert id="insertRevision">insert into cm_question_revision(id,question_id,revision_no,status,row_version,question_type,difficulty,estimated_seconds,stem,answer,analysis,common_mistakes,source_type,source_name,source_external_id,source_locator,authorization_status,authorization_note,content_hash,semantic_hash,knowledge_mapping_status,create_by,update_by) values(#{id},#{questionId},#{revisionNo},'draft',1,#{questionType},#{difficulty},#{estimatedSeconds},#{stem},#{answer}::jsonb,#{analysis},#{commonMistakes},#{source.sourceType},#{source.sourceName},#{source.sourceExternalId},#{source.sourceLocator},#{source.authorizationStatus},#{source.authorizationNote},#{contentHash},#{semanticHash},#{source.knowledgeMappingStatus},#{userId},#{userId}) on conflict (question_id) where status in ('draft','pending_review','rejected') do nothing</insert>
+    <delete id="deleteOptions">delete from cm_question_option where question_revision_id=#{revisionId}</delete>
+    <delete id="deleteQuestionKnowledge">delete from cm_question_knowledge where question_revision_id=#{revisionId}</delete>
+    <insert id="insertOption">insert into cm_question_option(id,question_revision_id,option_label,option_text,sort_order,create_by,update_by) values(#{id},#{revisionId},#{label},#{content},#{sortOrder},#{userId},#{userId})</insert>
+    <insert id="insertImage">insert into cm_question_image(id,question_revision_id,image_order,source_url,alt_text,storage_path,create_by,update_by) values(#{id},#{revisionId},#{sortOrder},#{sourceUrl},#{alt},#{storagePath},#{userId},#{userId})</insert>
+    <insert id="insertKnowledge">insert into cm_question_knowledge(id,question_revision_id,question_id,knowledge_point_id,exam_subject_id,relation_role,sort_order) values(#{id},#{revisionId},#{questionId},#{knowledgeId},#{subjectId},#{role},#{sortOrder})</insert>
+    <insert id="insertRevisionEvent">insert into cm_question_revision_event(id,question_id,question_revision_id,event_type,from_status,to_status,opinion,operator_id,request_id,trace_id) values(#{id},#{questionId},#{revisionId},#{eventType},#{fromStatus},#{toStatus},#{opinion},#{userId},#{requestId},#{traceId})</insert>
+    <select id="selectIdempotency" resultType="org.dromara.certmuse.question.domain.QuestionRows$Idempotency">select id,payload_hash,status,resource_id,response_status,cast(response_body as text) response_body from cm_idempotency_record where action_code=#{action} and request_id=#{requestId}</select>
+    <insert id="insertIdempotency">insert into cm_idempotency_record(id,action_code,request_id,payload_hash,status,resource_type,resource_id,expires_time) values(#{id},#{action},#{requestId},#{payloadHash},'processing',#{resourceType},#{resourceId},#{expiresTime}) on conflict (action_code,request_id) do nothing</insert>
+    <select id="selectReviewIdempotency" resultType="org.dromara.certmuse.question.domain.QuestionRows$Idempotency">select id,payload_hash,status,resource_id,response_status,cast(response_body as text) response_body from cm_idempotency_record where request_id=#{requestId} and action_code in ('approve_question_revision','reject_question_revision','offline_question_revision')</select>
+    <insert id="insertReviewIdempotency">insert into cm_idempotency_record(id,action_code,request_id,payload_hash,status,resource_type,resource_id,expires_time) values(#{id},#{action},#{requestId},#{payloadHash},'processing','question',#{questionId},#{expiresTime}) on conflict do nothing</insert>
+    <update id="completeIdempotency">update cm_idempotency_record set status='succeeded',response_status=#{responseStatus},response_body=#{responseBody}::jsonb,update_time=now() where id=#{id}</update>
+    <insert id="insertAudit">insert into cm_business_audit_log(id,operator_id,domain_code,action_code,target_type,target_id,before_data,after_data,trace_id) values(#{id},#{userId},'question','delete','question',#{questionId},#{beforeData}::jsonb,#{afterData}::jsonb,#{traceId})</insert>
+    <insert id="insertReviewAudit">insert into cm_business_audit_log(id,operator_id,domain_code,action_code,target_type,target_id,before_data,after_data,trace_id) values(#{id},#{userId},'question',#{action},'question_revision',#{revisionId},#{beforeData}::jsonb,#{afterData}::jsonb,#{traceId})</insert>
+</mapper>

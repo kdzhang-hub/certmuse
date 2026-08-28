@@ -1,0 +1,70 @@
+# Operating system files
+.DS_Store
+Thumbs.db
+
+# Editor and IDE settings
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output and caches
+dist/
+build/
+coverage/
+.ci-cache/
+.pnpm-store/
+.cache/
+.next/
+.nuxt/
+.vite/
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+!.env.demo
+
+# Private keys and credential bundles
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.kdb
+*.keystore
+id_rsa
+id_ed25519
+credentials*.json
+service-account*.json
+
+# Test and tooling caches
+.eslintcache
+.stylelintcache
+.pytest_cache/
+__pycache__/
+*.py[cod]
+
+# Temporary files
+tmp/
+temp/
+work/e2e-reports/
+
+# Project-local public agent tools and private operational profiles
+/tools/ops/local/
+/tools/ops/*.tar.gz
+/tools/ops/*.zip
+*.srvops.enc

@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" role="img" aria-labelledby="title desc">
+  <title id="title">CertMuse product overview</title>
+  <desc id="desc">A README visual showing CertMuse learner, operations, content, assessment, and AI extension surfaces.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#f8fbff"/>
+      <stop offset="0.52" stop-color="#eef6fc"/>
+      <stop offset="1" stop-color="#f6f4ea"/>
+    </linearGradient>
+    <linearGradient id="panel" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.96"/>
+      <stop offset="1" stop-color="#f9fbff" stop-opacity="0.9"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="28" stdDeviation="26" flood-color="#16385f" flood-opacity="0.13"/>
+    </filter>
+  </defs>
+
+  <rect width="1600" height="900" fill="url(#bg)"/>
+  <circle cx="1390" cy="135" r="220" fill="#b9d7f6" opacity="0.46"/>
+  <circle cx="140" cy="810" r="260" fill="#d7e7d4" opacity="0.52"/>
+  <path d="M0 720 C260 650 450 760 690 690 C930 620 1100 690 1600 580 L1600 900 L0 900 Z" fill="#ffffff" opacity="0.48"/>
+
+  <g transform="translate(118 112)">
+    <rect x="0" y="0" width="1364" height="676" rx="34" fill="url(#panel)" filter="url(#shadow)" stroke="#d7e6f5"/>
+
+    <g transform="translate(58 58)">
+      <rect x="0" y="0" width="92" height="92" rx="24" fill="#2878d8"/>
+      <text x="46" y="58" text-anchor="middle" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="30" font-weight="800" fill="#fff">CM</text>
+      <text x="0" y="158" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="72" font-weight="850" fill="#162940">CertMuse</text>
+      <text x="0" y="208" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="27" font-weight="600" fill="#536b86">Open source for certification learning and content operations.</text>
+
+      <g transform="translate(0 274)">
+        <rect x="0" y="0" width="206" height="72" rx="16" fill="#2878d8"/>
+        <text x="103" y="45" text-anchor="middle" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="23" font-weight="780" fill="#fff">Learner journey</text>
+        <rect x="224" y="0" width="206" height="72" rx="16" fill="#1f3855"/>
+        <text x="327" y="45" text-anchor="middle" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="23" font-weight="780" fill="#fff">Admin console</text>
+        <rect x="448" y="0" width="206" height="72" rx="16" fill="#315d40"/>
+        <text x="551" y="45" text-anchor="middle" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="23" font-weight="780" fill="#fff">Domain API</text>
+      </g>
+
+      <g transform="translate(0 410)">
+        <g>
+          <circle cx="16" cy="17" r="8" fill="#2878d8"/>
+          <text x="40" y="24" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="24" font-weight="650" fill="#294767">Goals, diagnostics, practice, mistakes, progress, resources</text>
+        </g>
+        <g transform="translate(0 48)">
+          <circle cx="16" cy="17" r="8" fill="#1f3855"/>
+          <text x="40" y="24" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="24" font-weight="650" fill="#294767">Catalog, questions, learning operations, insights</text>
+        </g>
+        <g transform="translate(0 96)">
+          <circle cx="16" cy="17" r="8" fill="#315d40"/>
+          <text x="40" y="24" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="24" font-weight="650" fill="#294767">Assessment, catalog, learning, profile, AI extensions</text>
+        </g>
+      </g>
+    </g>
+
+    <g transform="translate(850 70)">
+      <rect x="0" y="0" width="420" height="536" rx="28" fill="#162940"/>
+      <rect x="30" y="32" width="360" height="70" rx="18" fill="#203b59"/>
+      <circle cx="70" cy="67" r="16" fill="#7db9f4"/>
+      <rect x="102" y="55" width="190" height="18" rx="9" fill="#d8e9fb" opacity="0.94"/>
+      <rect x="318" y="55" width="42" height="18" rx="9" fill="#7db9f4" opacity="0.76"/>
+
+      <g transform="translate(30 132)">
+        <rect x="0" y="0" width="170" height="124" rx="20" fill="#f8fbff"/>
+        <text x="24" y="43" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="22" font-weight="800" fill="#162940">Learning</text>
+        <rect x="24" y="66" width="96" height="12" rx="6" fill="#7db9f4"/>
+        <rect x="24" y="88" width="122" height="12" rx="6" fill="#c6d7e9"/>
+      </g>
+      <g transform="translate(220 132)">
+        <rect x="0" y="0" width="170" height="124" rx="20" fill="#f8fbff"/>
+        <text x="24" y="43" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="22" font-weight="800" fill="#162940">Assessment</text>
+        <rect x="24" y="66" width="116" height="12" rx="6" fill="#7db9f4"/>
+        <rect x="24" y="88" width="94" height="12" rx="6" fill="#c6d7e9"/>
+      </g>
+      <g transform="translate(30 282)">
+        <rect x="0" y="0" width="170" height="124" rx="20" fill="#f8fbff"/>
+        <text x="24" y="43" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="22" font-weight="800" fill="#162940">Content</text>
+        <rect x="24" y="66" width="106" height="12" rx="6" fill="#a9c99f"/>
+        <rect x="24" y="88" width="126" height="12" rx="6" fill="#c6d7e9"/>
+      </g>
+      <g transform="translate(220 282)">
+        <rect x="0" y="0" width="170" height="124" rx="20" fill="#f8fbff"/>
+        <text x="24" y="43" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="22" font-weight="800" fill="#162940">AI ready</text>
+        <rect x="24" y="66" width="88" height="12" rx="6" fill="#a9c99f"/>
+        <rect x="24" y="88" width="130" height="12" rx="6" fill="#c6d7e9"/>
+      </g>
+
+      <rect x="30" y="450" width="360" height="46" rx="14" fill="#2878d8"/>
+      <text x="210" y="481" text-anchor="middle" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="20" font-weight="800" fill="#fff">Source only public release</text>
+    </g>
+  </g>
+</svg>

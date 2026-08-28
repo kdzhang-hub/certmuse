@@ -1,0 +1,274 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.dromara.certmuse.catalog.mapper.KnowledgeTreeMapper">
+    <resultMap id="syllabusListResultMap" type="org.dromara.certmuse.catalog.domain.vo.SyllabusListVo">
+        <constructor>
+            <arg column="id" javaType="String"/><arg column="display_name" javaType="String"/>
+            <arg column="certification_id" javaType="String"/><arg column="certification_name" javaType="String"/>
+            <arg column="version_name" javaType="String"/><arg column="published_date" javaType="java.time.LocalDate"/>
+            <arg column="update_time" javaType="java.time.OffsetDateTime"/>
+            <arg column="latest_knowledge_import_time" javaType="java.time.OffsetDateTime"/>
+            <arg column="knowledge_point_count" javaType="java.lang.Long"/><arg column="status" javaType="String"/>
+        </constructor>
+    </resultMap>
+    <resultMap id="overviewResultMap" type="org.dromara.certmuse.catalog.domain.vo.SyllabusOverviewBaseVo">
+        <constructor>
+            <arg column="id" javaType="String"/><arg column="certification_id" javaType="String"/>
+            <arg column="certification_name" javaType="String"/><arg column="version_name" javaType="String"/>
+            <arg column="published_date" javaType="java.time.LocalDate"/><arg column="created_time" javaType="java.time.OffsetDateTime"/>
+        </constructor>
+    </resultMap>
+    <resultMap id="latestImportResultMap" type="org.dromara.certmuse.catalog.domain.vo.LatestKnowledgeImportVo">
+        <constructor>
+            <arg column="batch_id" javaType="String"/><arg column="finished_time" javaType="java.time.OffsetDateTime"/>
+            <arg column="source_file_name" javaType="String"/><arg column="generated_count" javaType="java.lang.Integer"/>
+        </constructor>
+    </resultMap>
+    <resultMap id="summaryResultMap" type="org.dromara.certmuse.catalog.domain.vo.KnowledgeTreeSummaryVo">
+        <constructor>
+            <arg column="syllabus_version_record_count" javaType="java.lang.Integer"/><arg column="subject_count" javaType="java.lang.Integer"/>
+            <arg column="knowledge_point_count" javaType="java.lang.Long"/><arg column="directory_count" javaType="java.lang.Long"/>
+            <arg column="leaf_count" javaType="java.lang.Long"/>
+        </constructor>
+    </resultMap>
+    <resultMap id="subjectResultMap" type="org.dromara.certmuse.catalog.domain.vo.KnowledgeSubjectVo">
+        <constructor>
+            <arg column="id" javaType="String"/><arg column="subject_code" javaType="String"/>
+            <arg column="subject_name" javaType="String"/><arg column="sort_order" javaType="java.lang.Integer"/>
+            <arg column="knowledge_point_count" javaType="java.lang.Long"/>
+        </constructor>
+    </resultMap>
+    <resultMap id="nodeResultMap" type="org.dromara.certmuse.catalog.domain.vo.KnowledgeTreeNodeVo">
+        <constructor>
+            <arg column="id" javaType="String"/><arg column="parent_id" javaType="String"/>
+            <arg column="exam_subject_id" javaType="String"/><arg column="exam_subject_code" javaType="String"/>
+            <arg column="syllabus_number" javaType="String"/><arg column="syllabus_title" javaType="String"/>
+            <arg column="tree_depth" javaType="java.lang.Integer"/><arg column="sort_order" javaType="java.lang.Integer"/>
+            <arg column="importance" javaType="java.lang.Integer"/><arg column="diagnostic_enabled" javaType="java.lang.Boolean"/>
+            <arg column="recommendation_enabled" javaType="java.lang.Boolean"/><arg column="status" javaType="String"/>
+            <arg column="has_children" javaType="java.lang.Boolean"/><arg column="created_time" javaType="java.time.OffsetDateTime"/>
+            <arg column="updated_time" javaType="java.time.OffsetDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <sql id="syllabusWhere">
+        where ec.status = '0'
+        <if test="keyword != null">and (ec.certification_name ilike concat('%', #{keyword}, '%') or sv.version_name ilike concat('%', #{keyword}, '%'))</if>
+        <if test="certificationId != null">and sv.certification_id = #{certificationId}</if>
+        <if test="versionName != null">and sv.version_name ilike concat(#{versionName}, '%')</if>
+        <if test="status == 'available'">and exists (select 1 from cm_knowledge_point status_kp where status_kp.syllabus_version_id = sv.id and status_kp.del_flag = '0')</if>
+        <if test="status == 'empty'">and not exists (select 1 from cm_knowledge_point status_kp where status_kp.syllabus_version_id = sv.id and status_kp.del_flag = '0')</if>
+    </sql>
+
+    <select id="selectSyllabuses" resultMap="syllabusListResultMap">
+        with filtered_syllabuses as (
+            select sv.id, sv.certification_id, sv.version_name, sv.published_date, sv.update_time, ec.certification_name, ec.sort_order
+            from cm_syllabus_version sv join cm_exam_certification ec on ec.id = sv.certification_id
+            <include refid="syllabusWhere"/>
+        ), knowledge_counts as (
+            select kp.syllabus_version_id, count(*) as knowledge_point_count
+            from cm_knowledge_point kp join filtered_syllabuses fs on fs.id = kp.syllabus_version_id
+            where kp.del_flag = '0' group by kp.syllabus_version_id
+        ), latest_imports as (
+            select distinct on (ib.syllabus_version_id) ib.syllabus_version_id, ib.finished_time
+            from cm_import_batch ib join filtered_syllabuses fs on fs.id = ib.syllabus_version_id
+            where ib.import_type = 'knowledge_point' and ib.status = 'completed'
+            order by ib.syllabus_version_id, ib.finished_time desc nulls last, ib.id desc
+        )
+        select cast(fs.id as varchar) as id, fs.certification_name as display_name,
+               cast(fs.certification_id as varchar) as certification_id, fs.certification_name, fs.version_name,
+               fs.published_date, fs.update_time, li.finished_time as latest_knowledge_import_time,
+               coalesce(kc.knowledge_point_count, 0) as knowledge_point_count,
+               case when coalesce(kc.knowledge_point_count, 0) &gt; 0 then 'available' else 'empty' end as status
+        from filtered_syllabuses fs left join knowledge_counts kc on kc.syllabus_version_id = fs.id
+        left join latest_imports li on li.syllabus_version_id = fs.id
+        order by fs.sort_order, fs.published_date desc nulls last, fs.id desc
+        limit #{limit} offset #{offset}
+    </select>
+
+    <select id="countSyllabuses" resultType="long">
+        select count(*) from cm_syllabus_version sv join cm_exam_certification ec on ec.id = sv.certification_id
+        <include refid="syllabusWhere"/>
+    </select>
+
+    <select id="selectOverview" resultMap="overviewResultMap">
+        select cast(sv.id as varchar) as id, cast(sv.certification_id as varchar) as certification_id,
+               ec.certification_name, sv.version_name, sv.published_date, sv.create_time as created_time
+        from cm_syllabus_version sv join cm_exam_certification ec on ec.id = sv.certification_id and ec.status = '0'
+        where sv.id = #{syllabusVersionId}
+    </select>
+
+    <select id="selectLatestKnowledgeImport" resultMap="latestImportResultMap">
+        select cast(ib.id as varchar) as batch_id, ib.finished_time, ib.source_file_name, ib.generated_count
+        from cm_import_batch ib
+        where ib.syllabus_version_id = #{syllabusVersionId} and ib.import_type = 'knowledge_point' and ib.status = 'completed'
+        order by ib.finished_time desc nulls last, ib.id desc limit 1
+    </select>
+
+    <select id="selectSummary" resultMap="summaryResultMap">
+        select 1 as syllabus_version_record_count,
+               (select count(*) from cm_exam_subject es where es.certification_id = sv.certification_id)::int as subject_count,
+               count(kp.id) as knowledge_point_count,
+               count(kp.id) filter (where exists (select 1 from cm_knowledge_point child
+                   where child.parent_id = kp.id and child.syllabus_version_id = kp.syllabus_version_id
+                     and child.exam_subject_id = kp.exam_subject_id and child.del_flag = '0')) as directory_count,
+               count(kp.id) filter (where not exists (select 1 from cm_knowledge_point child
+                   where child.parent_id = kp.id and child.syllabus_version_id = kp.syllabus_version_id
+                     and child.exam_subject_id = kp.exam_subject_id and child.del_flag = '0')) as leaf_count
+        from cm_syllabus_version sv left join cm_knowledge_point kp
+            on kp.syllabus_version_id = sv.id and kp.del_flag = '0'
+        where sv.id = #{syllabusVersionId}
+        group by sv.id, sv.certification_id
+    </select>
+
+    <select id="selectSubjects" resultMap="subjectResultMap">
+        select cast(es.id as varchar) as id, es.subject_code, es.subject_name,
+               row_number() over (order by case es.subject_code
+                   when 'COMPREHENSIVE' then 1
+                   when 'CASE_ANALYSIS' then 2
+                   when 'ESSAY' then 3
+                   else 999
+               end, es.id)::int as sort_order,
+               count(kp.id) as knowledge_point_count
+        from cm_exam_subject es join cm_syllabus_version sv on sv.certification_id = es.certification_id
+        left join cm_knowledge_point kp on kp.syllabus_version_id = sv.id and kp.exam_subject_id = es.id and kp.del_flag = '0'
+        where sv.id = #{syllabusVersionId}
+        group by es.id, es.subject_code, es.subject_name
+        order by sort_order
+    </select>
+
+    <select id="selectNodes" resultMap="nodeResultMap">
+        select cast(kp.id as varchar) as id, cast(kp.parent_id as varchar) as parent_id,
+               cast(kp.exam_subject_id as varchar) as exam_subject_id, es.subject_code as exam_subject_code,
+               kp.syllabus_number, kp.syllabus_title, kp.tree_depth, kp.sort_order, kp.importance,
+               kp.diagnostic_enabled, kp.recommendation_enabled, kp.status,
+               exists (select 1 from cm_knowledge_point child where child.parent_id = kp.id
+                   and child.syllabus_version_id = kp.syllabus_version_id and child.exam_subject_id = kp.exam_subject_id
+                   and child.del_flag = '0') as has_children,
+               kp.create_time as created_time, kp.update_time as updated_time
+        from cm_knowledge_point kp join cm_exam_subject es on es.id = kp.exam_subject_id
+        where kp.syllabus_version_id = #{syllabusVersionId} and kp.del_flag = '0'
+        order by case es.subject_code
+            when 'COMPREHENSIVE' then 1
+            when 'CASE_ANALYSIS' then 2
+            when 'ESSAY' then 3
+            else 999
+        end, kp.tree_depth, kp.parent_id nulls first, kp.sort_order, kp.syllabus_number, kp.id
+    </select>
+
+    <select id="lockSyllabusVersion" resultType="long">
+        select id from cm_syllabus_version where id = #{syllabusVersionId} for update
+    </select>
+
+    <update id="updateSyllabusPublishedDate">
+        update cm_syllabus_version
+        set published_date = #{publishedDate}, update_by = #{userId}, update_time = now()
+        where id = #{syllabusVersionId}
+    </update>
+
+    <select id="selectIdempotency" resultType="org.dromara.certmuse.catalog.domain.CmIdempotencyRecord">
+        select payload_hash, status, resource_id, response_status, cast(response_body as text) response_body
+        from cm_idempotency_record where action_code = #{action} and request_id = #{requestId}
+    </select>
+
+    <insert id="insertIdempotency">
+        insert into cm_idempotency_record(
+            id, action_code, request_id, payload_hash, status, resource_type, resource_id, expires_time
+        ) values (
+            #{id}, #{action}, #{requestId}, #{payloadHash}, 'processing', 'syllabus_version', #{resourceId}, #{expiresTime}
+        )
+        on conflict (action_code, request_id) do nothing
+    </insert>
+
+    <update id="completeIdempotency">
+        update cm_idempotency_record
+        set status = 'succeeded', resource_id = #{resourceId}, response_status = 200,
+            response_body = cast(#{responseBody} as jsonb), update_time = now()
+        where action_code = #{action} and request_id = #{requestId}
+    </update>
+
+    <select id="countImportingImports" resultType="long">
+        select count(*) from cm_import_batch
+        where syllabus_version_id = #{syllabusVersionId}
+          and status = 'importing'
+    </select>
+
+    <select id="setQualificationCascadeDelete" resultType="string">
+        select set_config('certmuse.qualification_cascade_delete', case when #{enabled} then 'on' else 'off' end, true)
+    </select>
+
+    <select id="selectSourceObjectKeysBySyllabusVersion" resultType="string">
+        select distinct object_key from (
+            select source_file_path as object_key from cm_syllabus_version where id = #{syllabusVersionId}
+            union
+            select source_file_path as object_key from cm_document where syllabus_version_id = #{syllabusVersionId}
+            union
+            select batch.source_file_path as object_key
+            from cm_import_batch batch
+            left join cm_document document on document.id = batch.document_id
+            where batch.syllabus_version_id = #{syllabusVersionId}
+               or document.syllabus_version_id = #{syllabusVersionId}
+        ) storage_objects where coalesce(trim(object_key), '') &lt;&gt; ''
+    </select>
+
+    <select id="selectImageObjectKeysBySyllabusVersion" resultType="string">
+        select distinct storage_path from (
+            select image.storage_path
+            from cm_document_image image
+            join cm_document_chunk chunk on chunk.id = image.chunk_id
+            join cm_document document on document.id = chunk.document_id
+            where document.syllabus_version_id = #{syllabusVersionId}
+            union
+            select image.storage_path
+            from cm_question_image image
+            join cm_question_revision revision on revision.id = image.question_revision_id
+            where revision.question_id in (
+                select distinct question.id
+                from cm_question question
+                join cm_question_knowledge relation on relation.question_id = question.id
+                join cm_knowledge_point knowledge_point on knowledge_point.id = relation.knowledge_point_id
+                where knowledge_point.syllabus_version_id = #{syllabusVersionId}
+                  and not exists (
+                      select 1
+                      from cm_question_knowledge other_relation
+                      join cm_knowledge_point other_knowledge_point
+                        on other_knowledge_point.id = other_relation.knowledge_point_id
+                      where other_relation.question_id = question.id
+                        and other_knowledge_point.syllabus_version_id &lt;&gt; #{syllabusVersionId}
+                  )
+            )
+        ) storage_objects where coalesce(trim(storage_path), '') &lt;&gt; ''
+    </select>
+
+    <delete id="deleteKnowledgeImportDiffsBySyllabusVersion">
+        delete from cm_knowledge_import_diff
+        where import_batch_id in (
+            select id from cm_import_batch where syllabus_version_id = #{syllabusVersionId}
+        )
+    </delete>
+
+    <delete id="deleteQuestionsExclusiveToSyllabusVersion">
+        delete from cm_question question
+        where exists (
+            select 1
+            from cm_question_knowledge relation
+            join cm_knowledge_point knowledge_point on knowledge_point.id = relation.knowledge_point_id
+            where relation.question_id = question.id
+              and knowledge_point.syllabus_version_id = #{syllabusVersionId}
+        )
+          and not exists (
+            select 1
+            from cm_question_knowledge other_relation
+            join cm_knowledge_point other_knowledge_point
+              on other_knowledge_point.id = other_relation.knowledge_point_id
+            where other_relation.question_id = question.id
+              and other_knowledge_point.syllabus_version_id &lt;&gt; #{syllabusVersionId}
+        )
+    </delete>
+
+    <delete id="deleteSyllabusVersion">
+        delete from cm_syllabus_version where id = #{syllabusVersionId}
+    </delete>
+</mapper>
