@@ -7,8 +7,6 @@ import org.dromara.certmuse.ai.domain.AiModelRequest;
 public record PracticeAiContext(
     AiModelRequest request,
     List<String> correctLabels,
-    String analysis,
-    List<Long> knowledgePointIds,
-    String retrievalQuery
+    String analysis
 ) {
 }

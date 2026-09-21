@@ -3,7 +3,6 @@ import { ElMessage } from 'element-plus/es';
 import * as NProgressModule from 'nprogress';
 import 'nprogress/nprogress.css';
 import { getOnboardingStatus } from '@/api/certmuse/learning/onboarding';
-import type { OnboardingStatus } from '@/api/types';
 import { useSettingsStore } from '@/store/modules/settings';
 import { useUserStore } from '@/store/modules/user';
 import { getToken } from '@/utils/auth';
@@ -15,26 +14,6 @@ import router from './router';
 import { seedStudentRoutes } from './router/student';
 
 const NProgress = ('default' in NProgressModule ? NProgressModule.default : NProgressModule) as typeof NProgressModule;
-
-let onboardingStatusSnapshot: OnboardingStatus | undefined;
-let onboardingStatusRequest: Promise<OnboardingStatus | undefined> | undefined;
-
-const loadOnboardingStatus = () => {
-  if (onboardingStatusSnapshot) {
-    return Promise.resolve(onboardingStatusSnapshot);
-  }
-  if (!onboardingStatusRequest) {
-    onboardingStatusRequest = getOnboardingStatus()
-      .then(response => {
-        onboardingStatusSnapshot = response.data;
-        return onboardingStatusSnapshot;
-      })
-      .finally(() => {
-        onboardingStatusRequest = undefined;
-      });
-  }
-  return onboardingStatusRequest;
-};
 
 NProgress.configure({ showSpinner: false });
 const whiteList = [
@@ -66,7 +45,7 @@ const requiresLearningGoal = (path: string) =>
 
 const goalRequiredRedirect = async (path: string) => {
   if (!requiresLearningGoal(path)) return undefined;
-  const status = await loadOnboardingStatus();
+  const status = (await getOnboardingStatus()).data;
   return status?.nextAction === 'SET_GOAL' ? '/learning/goal-required' : undefined;
 };
 
@@ -87,7 +66,7 @@ const onboardingRedirect = async (path: string) => {
   // 自我诊断只保护自身会话状态；有有效学习目标的学员可以先使用其他学习能力。
   const protectedPath = path.startsWith('/learning/diagnostic/');
   if (!protectedPath || path === '/learning/onboarding-error') return undefined;
-  const status = await loadOnboardingStatus();
+  const status = (await getOnboardingStatus()).data;
   const target =
     status && isConsistentOnboardingStatus(status)
       ? resolveOnboardingTargetWithSession(status.nextAction, status.activeSessionId)
@@ -200,6 +179,5 @@ router.beforeEach(async (to, from) => {
 });
 
 router.afterEach(() => {
-  onboardingStatusSnapshot = undefined;
   NProgress.done();
 });

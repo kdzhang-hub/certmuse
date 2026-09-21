@@ -39,8 +39,7 @@ public interface PracticeAiChatMapper {
     int insertAssistantMessage(@Param("id") long id, @Param("conversationId") long conversationId,
                                @Param("userMessageId") long userMessageId,
                                @Param("sequence") int sequence, @Param("disclosureMode") String disclosureMode);
-    int completeAssistantMessage(@Param("id") long id, @Param("content") String content,
-                                 @Param("citations") String citations);
+    int completeAssistantMessage(@Param("id") long id, @Param("content") String content);
     int failAssistantMessage(@Param("id") long id, @Param("errorCode") String errorCode);
     int cancelAssistantMessage(long id);
     List<PracticeAiMessageRow> selectStaleGenerating(int seconds);

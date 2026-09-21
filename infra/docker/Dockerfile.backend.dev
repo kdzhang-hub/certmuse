@@ -1,0 +1,9 @@
+FROM maven:3.9.11-eclipse-temurin-21
+
+RUN apt-get update \
+    && apt-get install --no-install-recommends -y netcat-openbsd \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspace/backend
+
+EXPOSE 8080

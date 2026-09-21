@@ -1,10 +1,14 @@
 {
   "$schema": "https://json.schemastore.org/package",
   "name": "certmuse-student",
-  "version": "6.0.0-BETA",
-  "description": "CertMuse student web application",
+  "version": "6.0.0",
+  "description": "CertMuse 学生端，直接基于 RuoYi-Vue-Plus 6.X Vue 模板",
   "license": "MIT",
-  "author": "CertMuse contributors",
+  "author": "LionLi",
+  "repository": {
+    "type": "git",
+    "url": "https://gitee.com/JavaLionLi/plus-ui.git"
+  },
   "packageManager": "pnpm@10.34.5",
   "type": "module",
   "scripts": {
@@ -17,7 +21,9 @@
     "lint:fix": "oxlint --fix src",
     "preview": "vite preview",
     "prepare:typecheck": "vite build --mode development --outDir node_modules/.tmp/student-typecheck --emptyOutDir",
-    "typecheck": "pnpm run prepare:typecheck && vue-tsc --noEmit"
+    "typecheck": "pnpm run prepare:typecheck && vue-tsc --noEmit",
+    "test:coverage": "vitest run --coverage",
+    "test:unit": "vitest run"
   },
   "dependencies": {
     "@element-plus/icons-vue": "2.3.2",
@@ -56,8 +62,11 @@
     "@unocss/preset-attributify": "66.7.5",
     "@unocss/preset-wind3": "66.7.5",
     "@vitejs/plugin-vue": "^6.0.8",
+    "@vitest/coverage-v8": "4.1.10",
     "@vue/compiler-sfc": "3.5.40",
+    "@vue/test-utils": "2.4.11",
     "autoprefixer": "10.5.4",
+    "jsdom": "26.1.0",
     "oxfmt": "^0.60.0",
     "oxlint": "^1.75.0",
     "sass": "1.102.0",
@@ -68,6 +77,7 @@
     "unplugin-vue-setup-extend-plus": "1.0.1",
     "vite": "^8.1.5",
     "vite-plugin-svg-icons-ng": "^1.9.2",
+    "vitest": "4.1.10",
     "vue-tsc": "^3.3.8"
   },
   "browserslist": [

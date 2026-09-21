@@ -1,0 +1,2 @@
+{"schema_version":"1.0","source_key":"demo:1:1.1","subject_no":1,"syllabus_number":"1.1","syllabus_title":"架构基础","parent_syllabus_number":null,"tree_depth":1,"sort_order":1,"description":"根知识点","importance":null,"diagnostic_enabled":true,"recommendation_enabled":true,"status":"0"}
+{"schema_version":"1.0","source_key":"demo:1:1.1.1","subject_no":1,"syllabus_number":"1.1.1","syllabus_title":"架构风格","parent_syllabus_number":"1.1","tree_depth":2,"sort_order":1,"description":"子知识点","importance":null,"diagnostic_enabled":true,"recommendation_enabled":true,"status":"0"}

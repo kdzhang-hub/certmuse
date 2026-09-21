@@ -32,8 +32,7 @@ public class SubjectiveGradingTasks {
                     "referenceAnswer", g.path("answer").path("value").asText(), "knowledge", k.path("items")));
                 mapper.insertTask(IdUtil.getSnowflakeNextId(), key, "RUBRIC_GENERATION", revisionId, null, null,
                     write(Map.of("questionRevisionId", revisionId, "contextHash", DigestUtil.sha256Hex(context),
-                        "promptVersion", "subjective-rubric/2.0", "knowledgePointIds", knowledgeIds(k.path("items")),
-                        "retrievalQuery", p.path("stem").asText(), "messages", List.of(
+                        "promptVersion", "subjective-rubric/1.1", "messages", List.of(
                             Map.of("role", "system", "content", "你是一名公平、严谨的考试评分标准设计专家。"),
                             Map.of("role", "user", "content", "仅返回 JSON，对象中必须包含 items。每个评分项必须包含 code、description 和正数 weight，所有 weight 之和必须为 1。description 必须使用中文。请基于以下可信题目上下文生成稳定的评分量规：" + context)))));
                 return new TaskState("RUBRIC_PENDING", null, null, null);
@@ -65,15 +64,6 @@ public class SubjectiveGradingTasks {
 
     private JsonNode tree(String value) { try { return jsonMapper.readTree(value); } catch (Exception exception) { throw new IllegalStateException("frozen subjective snapshot is invalid", exception); } }
     private String write(Object value) { try { return jsonMapper.writeValueAsString(value); } catch (Exception exception) { throw new IllegalStateException("subjective task serialization failed", exception); } }
-
-    private List<Long> knowledgeIds(JsonNode values) {
-        java.util.ArrayList<Long> result = new java.util.ArrayList<>();
-        if (values.isArray()) values.forEach(value -> {
-            long id = value.path("knowledgePointId").asLong(0);
-            if (id > 0 && !result.contains(id)) result.add(id);
-        });
-        return List.copyOf(result);
-    }
 
     public record TaskState(String status, String result, String errorCode, String rubric) { }
 }

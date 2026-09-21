@@ -39,7 +39,7 @@ const settingsStore = useSettingsStore();
 const permissionStore = usePermissionStore();
 const sidebarRouters = computed<RouteRecordRaw[]>(() => permissionStore.getSidebarRoutes());
 const showLogo = computed(() => settingsStore.sidebarLogo);
-const sideTheme = computed(() => (settingsStore.dark ? 'theme-dark' : settingsStore.sideTheme));
+const sideTheme = computed(() => settingsStore.sideTheme);
 const theme = computed(() => settingsStore.theme);
 const isCollapse = computed(() => !appStore.sidebar.opened);
 

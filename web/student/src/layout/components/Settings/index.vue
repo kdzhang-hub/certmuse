@@ -50,7 +50,7 @@
     <div class="setting-drawer-block-checbox">
       <div class="setting-drawer-block-checbox-item" @click="handleTheme(SideThemeEnum.DARK)">
         <img src="@/assets/images/dark.svg" alt="dark" />
-        <div v-if="activeSideTheme === 'theme-dark'" class="setting-drawer-block-checbox-selectIcon" style="display: block">
+        <div v-if="sideTheme === 'theme-dark'" class="setting-drawer-block-checbox-selectIcon" style="display: block">
           <i aria-label="图标: check" class="anticon anticon-check">
             <svg
               viewBox="64 64 896 896"
@@ -70,7 +70,7 @@
       </div>
       <div class="setting-drawer-block-checbox-item" @click="handleTheme(SideThemeEnum.LIGHT)">
         <img src="@/assets/images/light.svg" alt="light" />
-        <div v-if="activeSideTheme === 'theme-light'" class="setting-drawer-block-checbox-selectIcon" style="display: block">
+        <div v-if="sideTheme === 'theme-light'" class="setting-drawer-block-checbox-selectIcon" style="display: block">
           <i aria-label="图标: check" class="anticon anticon-check">
             <svg
               viewBox="64 64 896 896"
@@ -98,7 +98,7 @@
     <div class="drawer-item">
       <span>深色模式</span>
       <span class="comp-style">
-        <el-switch v-model="isDark" class="drawer-switch" />
+        <el-switch v-model="isDark" class="drawer-switch" @change="toggleDark" />
       </span>
     </div>
     <div class="drawer-item">
@@ -190,14 +190,21 @@ const storeSettings = computed(() => settingsStore);
 const predefineColors = ref(['#409EFF', '#ff4500', '#ff8c00', '#ffd700', '#90ee90', '#00ced1', '#1e90ff', '#c71585']);
 const navType = ref(settingsStore.navType);
 const radiusBase = ref(settingsStore.radiusBase);
-// 公共首页与学习端共享同一份全局主题状态。
-const isDark = computed({
-  get: () => settingsStore.dark,
-  set: value => {
-    settingsStore.dark = value;
+// 是否暗黑模式
+const isDark = useDark({
+  storageKey: 'useDarkKey',
+  valueDark: 'dark',
+  valueLight: 'light'
+});
+// 匹配菜单颜色
+watch(isDark, () => {
+  if (isDark.value) {
+    settingsStore.sideTheme = SideThemeEnum.DARK;
+  } else {
+    settingsStore.sideTheme = sideTheme.value;
   }
 });
-const activeSideTheme = computed(() => (isDark.value ? SideThemeEnum.DARK : sideTheme.value));
+const toggleDark = () => useToggle(isDark);
 
 /** 菜单导航设置 */
 watch(
@@ -237,6 +244,11 @@ const radiusBaseChange = (val: number) => {
 };
 const handleTheme = (val: string) => {
   sideTheme.value = val;
+  if (isDark.value && val === SideThemeEnum.LIGHT) {
+    // 暗黑模式颜色不变
+    settingsStore.sideTheme = SideThemeEnum.DARK;
+    return;
+  }
   settingsStore.sideTheme = val;
 };
 const saveSetting = () => {
@@ -253,7 +265,6 @@ const saveSetting = () => {
   settings.value.dynamicTitle = storeSettings.value.dynamicTitle;
   settings.value.sideTheme = storeSettings.value.sideTheme;
   settings.value.theme = storeSettings.value.theme;
-  settings.value.dark = storeSettings.value.dark;
   settings.value.navType = storeSettings.value.navType;
   settings.value.radiusBase = storeSettings.value.radiusBase;
   settings.value.fullHeightTable = storeSettings.value.fullHeightTable;

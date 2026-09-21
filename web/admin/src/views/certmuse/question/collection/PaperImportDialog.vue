@@ -99,8 +99,7 @@
         <el-upload
           v-model:file-list="fileList"
           :auto-upload="false"
-          :limit="maxArchiveFiles"
-          multiple
+          :limit="1"
           accept=".zip,application/zip,application/x-zip-compressed"
           :disabled="hasBatch"
           :on-change="handleFileChange"
@@ -109,12 +108,9 @@
         >
           <el-button type="primary" plain :disabled="hasBatch">选择 ZIP 文件</el-button>
           <template #tip>
-            <div class="el-upload__tip">可选 1～3 个 ZIP，或选择一个题集文件夹；合计最大 64 MiB。</div>
+            <div class="el-upload__tip">根目录需包含 questions.jsonl，可含 images/；最大 64 MiB。</div>
           </template>
         </el-upload>
-        <input ref="folderInput" class="folder-input" type="file" multiple webkitdirectory @change="handleFolderChange" />
-        <el-button plain :disabled="hasBatch" @click="pickFolder">选择题集文件夹</el-button>
-        <div class="field-tip">文件夹内只能直接包含 1～3 个题目 ZIP，不要选择包含多个年份的总目录。</div>
         <div v-if="fileError" class="error-tip">{{ fileError }}</div>
         <div v-else-if="hashState === 'calculating'" class="field-tip">正在计算 SHA-256…</div>
         <div v-else-if="fileHash" class="field-tip">SHA-256：{{ fileHash.slice(0, 16) }}…</div>
@@ -218,13 +214,12 @@
 </template>
 
 <script setup lang="ts">
-import type { UploadFile, UploadFiles, UploadRawFile, UploadUserFile } from 'element-plus';
+import type { UploadFile, UploadUserFile } from 'element-plus';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue';
 import type { QualificationVO } from '@/api/certmuse/catalog/subject-version/types';
 import type {
   PaperImportBatchVO,
-  PaperImportErrorVO,
   PaperImportIssueVO,
   PaperImportProgressVO
 } from '@/api/certmuse/question/paper-import';
@@ -236,12 +231,11 @@ import {
   listPaperImportIssues,
   validatePaperImport
 } from '@/api/certmuse/question/paper-import';
-import { extractErrorMessage, getHandledRequestError } from '@/utils/request';
+import { extractErrorMessage } from '@/utils/request';
 
 const props = defineProps<{ modelValue: boolean }>();
 const emit = defineEmits<{ 'update:modelValue': [value: boolean]; success: [result: PaperImportProgressVO] }>();
 const maxArchiveSize = 64 * 1024 * 1024;
-const maxArchiveFiles = 3;
 const pollingInterval = 1500;
 const form = reactive({
   collectionName: '',
@@ -256,7 +250,6 @@ const form = reactive({
 const qualifications = ref<QualificationVO[]>([]);
 const qualificationsLoading = ref(false);
 const fileList = ref<UploadUserFile[]>([]);
-const folderInput = ref<HTMLInputElement>();
 const fileError = ref('');
 const fileHash = ref('');
 const hashState = ref<'idle' | 'calculating' | 'success' | 'failed'>('idle');
@@ -282,7 +275,7 @@ const statusLabels: Record<string, string> = {
 };
 
 const dialogVisible = computed({ get: () => props.modelValue, set: value => emit('update:modelValue', value) });
-const selectedFiles = computed<File[]>(() => fileList.value.flatMap(item => (item.raw ? [item.raw] : [])));
+const selectedFile = computed(() => fileList.value[0]?.raw ?? null);
 const hasBatch = computed(() => Boolean(batch.value));
 const pastPaperMetadataComplete = computed(
   () =>
@@ -308,7 +301,7 @@ const startDisabled = computed(
     !form.collectionName ||
     !form.certificationId ||
     !pastPaperMetadataComplete.value ||
-    selectedFiles.value.length === 0 ||
+    !selectedFile.value ||
     Boolean(fileError.value) ||
     hashState.value !== 'success'
 );
@@ -333,51 +326,23 @@ async function loadQualifications() {
   }
 }
 
-async function handleFileChange(file: UploadFile, uploadFiles?: UploadFiles) {
-  const files = (uploadFiles ?? [file]).map(item => item.raw).filter(Boolean) as File[];
-  await setFiles(files);
-}
-
-function pickFolder() {
-  folderInput.value?.click();
-}
-
-async function handleFolderChange(event: Event) {
-  const input = event.target as HTMLInputElement;
-  const files = Array.from(input.files ?? []);
-  await setFiles(files, true);
-  input.value = '';
-}
-
-async function setFiles(files: File[], fromFolder = false) {
+async function handleFileChange(file: UploadFile) {
   resetRuntime();
   resetIdentity();
   fileError.value = '';
   fileHash.value = '';
   hashState.value = 'idle';
-  fileList.value = files.map((file, index) => ({ name: file.name, raw: toUploadRawFile(file, index) }));
-  if (!files.length) fileError.value = '文件夹中没有 ZIP 文件。';
-  else if (files.length > maxArchiveFiles) fileError.value = '一个题集文件夹最多包含 3 个 ZIP 文件。';
-  else if (fromFolder && files.some(file => file.webkitRelativePath.split('/').filter(Boolean).length !== 2)) {
-    fileError.value = '题集文件夹只能直接包含 ZIP 文件，不能包含子目录。';
-  } else if (files.some(file => file.size === 0)) fileError.value = '文件不能为空。';
-  else if (files.some(file => !file.name.toLowerCase().endsWith('.zip'))) fileError.value = '试卷导入只支持 .zip 文件。';
-  else if (files.reduce((total, file) => total + file.size, 0) > maxArchiveSize)
-    fileError.value = files.length > 1 ? 'ZIP 包合计超过 64 MiB 上限，请重新选择。' : 'ZIP 包超过 64 MiB 上限，请重新选择。';
+  if (!file.raw || file.raw.size === 0) fileError.value = '文件不能为空。';
+  else if (!file.name.toLowerCase().endsWith('.zip')) fileError.value = '试卷导入只支持 .zip 文件。';
+  else if (file.raw.size > maxArchiveSize) fileError.value = 'ZIP 包超过 64 MiB 上限，请重新选择。';
   else {
-    for (const file of files) {
-      const prefix = new Uint8Array(await file.slice(0, 4).arrayBuffer());
-      if (prefix.length < 4 || prefix[0] !== 0x50 || prefix[1] !== 0x4b) {
-        fileError.value = `文件不是有效的 ZIP 包：${file.name}`;
-        break;
-      }
-    }
+    const prefix = new Uint8Array(await file.raw.slice(0, 4).arrayBuffer());
+    if (prefix.length < 4 || prefix[0] !== 0x50 || prefix[1] !== 0x4b) fileError.value = '文件不是有效的 ZIP 包。';
   }
-  if (fileError.value) return;
+  if (fileError.value || !file.raw) return;
   hashState.value = 'calculating';
   try {
-    const content = new Blob(files);
-    const digest = await crypto.subtle.digest('SHA-256', await content.arrayBuffer());
+    const digest = await crypto.subtle.digest('SHA-256', await file.raw.arrayBuffer());
     fileHash.value = Array.from(new Uint8Array(digest), item => item.toString(16).padStart(2, '0')).join('');
     hashState.value = 'success';
   } catch {
@@ -386,12 +351,8 @@ async function setFiles(files: File[], fromFolder = false) {
   }
 }
 
-function toUploadRawFile(file: File, index: number): UploadRawFile {
-  return Object.assign(file, { uid: -Date.now() - index });
-}
-
 function handleFileExceed() {
-  fileError.value = '一次最多选择 3 个 ZIP 文件。';
+  fileError.value = '一次只能选择一个 ZIP 文件。';
 }
 function resetFile() {
   fileList.value = [];
@@ -414,11 +375,11 @@ function resetRuntime() {
 }
 
 async function startPrecheck() {
-  if (startDisabled.value || !selectedFiles.value.length) return;
+  if (startDisabled.value || !selectedFile.value) return;
   submitting.value = true;
   operationError.value = '';
   try {
-    const created = await createPaperImport({ ...form, files: selectedFiles.value, requestId: crypto.randomUUID() });
+    const created = await createPaperImport({ ...form, file: selectedFile.value, requestId: crypto.randomUUID() });
     if (!created.data) throw new Error('创建试卷导入批次响应缺少 data。');
     batch.value = created.data;
     const accepted = await validatePaperImport(batch.value.id, crypto.randomUUID());
@@ -489,13 +450,6 @@ function searchIssues() {
   if (batch.value) void loadIssues();
 }
 async function operationErrorMessage(error: unknown, fallback: string) {
-  const handled = getHandledRequestError<PaperImportErrorVO>(error);
-  const responseData = handled?.responseData
-    ?? (error as { response?: { data?: { data?: PaperImportErrorVO } } })?.response?.data?.data;
-  const fieldErrors = responseData?.fieldErrors ?? [];
-  if (fieldErrors.length) {
-    return fieldErrors.map(item => `${item.field}：${item.message}`).join('；');
-  }
   return (await extractErrorMessage(error)) || fallback;
 }
 function schedulePolling() {
@@ -548,9 +502,6 @@ onBeforeUnmount(stopPolling);
   margin-left: 8px;
   color: var(--el-text-color-secondary);
   font-size: 12px;
-}
-.folder-input {
-  display: none;
 }
 .error-tip {
   margin-top: 6px;

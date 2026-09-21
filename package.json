@@ -1,0 +1,17 @@
+{
+  "name": "certmuse-quality-gates",
+  "private": true,
+  "scripts": {
+    "prepare": "husky",
+    "check:admin:fast": "pnpm --dir web/admin typecheck && pnpm --dir web/admin lint && pnpm --dir web/admin test:unit",
+    "check:student:fast": "pnpm --dir web/student typecheck && pnpm --dir web/student lint && pnpm --dir web/student test:unit",
+    "check:admin": "pnpm run check:admin:fast && pnpm --dir web/admin build",
+    "check:student": "pnpm run check:student:fast && pnpm --dir web/student build",
+    "test:coverage": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./tools/test-coverage.ps1",
+    "test:certmuse": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./tools/test-certmuse.ps1",
+    "test:e2e:manifest": "node ./tests/e2e/validate-manifest.mjs && node ./tests/e2e/validate-placeholders.mjs"
+  },
+  "devDependencies": {
+    "husky": "^9.1.7"
+  }
+}

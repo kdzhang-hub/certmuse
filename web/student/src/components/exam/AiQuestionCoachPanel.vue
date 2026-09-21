@@ -11,37 +11,14 @@
     @pointerdown="startDrag"
     @click="expandPanel"
   >
-    <ChatDotRound />
-    AI讲解
+    <ChatDotRound /> AI讲解
   </button>
 
-  <aside
-    v-if="opened && !collapsed"
-    ref="panelRef"
-    class="ai-question-coach"
-    :style="floatingStyle"
-    aria-label="AI 讲解"
-  >
-    <div
-      class="ai-question-coach__drag-edge ai-question-coach__drag-edge--top"
-      aria-label="按住拖动 AI 讲解窗口"
-      @pointerdown="startDrag"
-    />
-    <div
-      class="ai-question-coach__drag-edge ai-question-coach__drag-edge--right"
-      aria-label="按住拖动 AI 讲解窗口"
-      @pointerdown="startDrag"
-    />
-    <div
-      class="ai-question-coach__drag-edge ai-question-coach__drag-edge--bottom"
-      aria-label="按住拖动 AI 讲解窗口"
-      @pointerdown="startDrag"
-    />
-    <div
-      class="ai-question-coach__drag-edge ai-question-coach__drag-edge--left"
-      aria-label="按住拖动 AI 讲解窗口"
-      @pointerdown="startDrag"
-    />
+  <aside v-if="opened && !collapsed" ref="panelRef" class="ai-question-coach" :style="floatingStyle" aria-label="AI 讲解">
+    <div class="ai-question-coach__drag-edge ai-question-coach__drag-edge--top" aria-label="按住拖动 AI 讲解窗口" @pointerdown="startDrag" />
+    <div class="ai-question-coach__drag-edge ai-question-coach__drag-edge--right" aria-label="按住拖动 AI 讲解窗口" @pointerdown="startDrag" />
+    <div class="ai-question-coach__drag-edge ai-question-coach__drag-edge--bottom" aria-label="按住拖动 AI 讲解窗口" @pointerdown="startDrag" />
+    <div class="ai-question-coach__drag-edge ai-question-coach__drag-edge--left" aria-label="按住拖动 AI 讲解窗口" @pointerdown="startDrag" />
     <header class="ai-question-coach__header">
       <div class="ai-question-coach__title">
         <ChatDotRound />
@@ -69,47 +46,12 @@
       </el-button>
       <el-skeleton v-if="loadingHistory" :rows="4" animated />
       <template v-else-if="messages.length">
-        <article
-          v-for="message in messages"
-          :key="message.id"
-          class="ai-question-coach__message"
-          :class="`is-${message.role.toLowerCase()}`"
-        >
+        <article v-for="message in messages" :key="message.id" class="ai-question-coach__message" :class="`is-${message.role.toLowerCase()}`">
           <strong>{{ message.role === 'USER' ? '我' : 'AI 助教' }}</strong>
-          <div
-            v-if="message.role === 'ASSISTANT' && message.content"
-            class="ai-question-coach__markdown"
-            v-html="safeMarkdown(message.content)"
-          />
+          <div v-if="message.role === 'ASSISTANT' && message.content" class="ai-question-coach__markdown" v-html="safeMarkdown(message.content)" />
           <p v-else-if="message.content">{{ message.content }}</p>
-          <section
-            v-if="message.role === 'ASSISTANT' && message.citations.length"
-            class="ai-question-coach__sources"
-            aria-label="教材来源"
-          >
-            <span class="ai-question-coach__sources-title">教材来源</span>
-            <button
-              v-for="citation in uniqueCitations(message.citations)"
-              :key="citationKey(citation)"
-              type="button"
-              class="ai-question-coach__source"
-              :title="`查看《${citation.textbookTitle}》原文`"
-              @click="openCitation(citation)"
-            >
-              <Document />
-              <span>
-                <strong>
-                  {{ citation.textbookTitle }}
-                  <template v-if="citation.edition">· {{ citation.edition }}</template>
-                </strong>
-                <small>{{ citationLocation(citation) }}</small>
-              </span>
-            </button>
-          </section>
           <small v-if="message.status === 'GENERATING'">正在生成…</small>
-          <small v-else-if="message.status === 'FAILED'">
-            生成失败{{ message.errorCode ? `：${message.errorCode}` : '' }}
-          </small>
+          <small v-else-if="message.status === 'FAILED'">生成失败{{ message.errorCode ? `：${message.errorCode}` : '' }}</small>
           <small v-else-if="message.status === 'CANCELLED'">已停止生成</small>
         </article>
       </template>
@@ -138,20 +80,12 @@
       </div>
     </footer>
   </aside>
-
-  <PdfReaderDialog
-    v-model="pdfDialogVisible"
-    :document-title="readingCitation?.textbookTitle"
-    :reader="pdfReader"
-    :initial-page="readingCitation?.pageStart ?? 1"
-    @refresh="refreshPdfReader"
-  />
 </template>
 
 <script setup lang="ts">
-import { ChatDotRound, Delete, Document } from '@element-plus/icons-vue';
-import { marked } from 'marked';
+import { ChatDotRound, Delete } from '@element-plus/icons-vue';
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
+import { marked } from 'marked';
 import {
   cancelAiMessage,
   createAiConversation,
@@ -160,14 +94,11 @@ import {
   streamAiMessage,
   type AiChatErrorVo,
   type AiChatMessageVo,
-  type AiCitation,
   type AiConversationVo,
   type AiStreamEvent
 } from '@/api/certmuse/assessment/ai-conversations';
-import { getLearningTextbookPdfReader, type LearningTextbookPdfReaderVO } from '@/api/certmuse/learning/textbooks';
-import { contractErrorFrom } from '@/utils/learning-goal';
 import { sanitizeHtml } from '@/utils/sanitize';
-import PdfReaderDialog from '@/views/student/resources/PdfReaderDialog.vue';
+import { contractErrorFrom } from '@/utils/learning-goal';
 
 const props = defineProps<{
   sessionId: string;
@@ -176,9 +107,7 @@ const props = defineProps<{
   submitted: boolean;
 }>();
 
-type UiMessage = Pick<AiChatMessageVo, 'id' | 'role' | 'content' | 'status' | 'errorCode'> & {
-  citations: AiCitation[];
-};
+type UiMessage = Pick<AiChatMessageVo, 'id' | 'role' | 'content' | 'status' | 'errorCode'>;
 
 const opened = ref(false);
 const collapsed = ref(false);
@@ -193,43 +122,21 @@ const hasMore = ref(false);
 const nextBeforeSequence = ref<number>();
 const panelRef = ref<HTMLElement>();
 const messageListRef = ref<HTMLElement>();
-const pdfDialogVisible = ref(false);
-const pdfReader = ref<LearningTextbookPdfReaderVO>();
-const readingCitation = ref<AiCitation>();
 const floatingPosition = ref<{ left: number; top: number }>();
 let abortController: AbortController | undefined;
 let generatingAssistantMessageId: string | undefined;
 let drag:
-  | {
-      element: HTMLElement;
-      originLeft: number;
-      originTop: number;
-      offsetX: number;
-      offsetY: number;
-      width: number;
-      height: number;
-      startX: number;
-      startY: number;
-    }
+  | { element: HTMLElement; originLeft: number; originTop: number; offsetX: number; offsetY: number; width: number; height: number; startX: number; startY: number }
   | undefined;
 let pendingPosition: { left: number; top: number } | undefined;
 let dragFrame: number | undefined;
 let wasDragged = false;
 
 const floatingStyle = computed(() =>
-  floatingPosition.value
-    ? {
-        left: `${floatingPosition.value.left}px`,
-        top: `${floatingPosition.value.top}px`,
-        right: 'auto',
-        bottom: 'auto'
-      }
-    : undefined
+  floatingPosition.value ? { left: `${floatingPosition.value.left}px`, top: `${floatingPosition.value.top}px`, right: 'auto', bottom: 'auto' } : undefined
 );
 const disclosureHint = computed(() =>
-  conversation.value?.answerDisclosureMode === 'FULL_EXPLANATION'
-    ? '可以询问答案和错因'
-    : '提供思路提示，不直接公布答案'
+  conversation.value?.answerDisclosureMode === 'FULL_EXPLANATION' ? '可以询问答案和错因' : '提供思路提示，不直接公布答案'
 );
 
 watch(
@@ -280,10 +187,7 @@ async function loadConversation() {
     const created = await createAiConversation(props.sessionId, props.questionOrder, crypto.randomUUID().toLowerCase());
     conversation.value = created.data?.conversation;
     if (!conversation.value) throw new Error('未取得 AI 对话。');
-    const [summary, page] = await Promise.all([
-      getAiConversation(conversation.value.conversationId),
-      listAiMessages(conversation.value.conversationId)
-    ]);
+    const [summary, page] = await Promise.all([getAiConversation(conversation.value.conversationId), listAiMessages(conversation.value.conversationId)]);
     conversation.value = summary.data ?? conversation.value;
     applyMessagePage(page.data, false);
   } catch (error) {
@@ -297,10 +201,7 @@ async function loadOlderMessages() {
   if (!conversation.value || !hasMore.value || !nextBeforeSequence.value || locallyCleared.value) return;
   loadingHistory.value = true;
   try {
-    const page = await listAiMessages(conversation.value.conversationId, {
-      beforeSequence: nextBeforeSequence.value,
-      limit: 50
-    });
+    const page = await listAiMessages(conversation.value.conversationId, { beforeSequence: nextBeforeSequence.value, limit: 50 });
     applyMessagePage(page.data, true);
   } catch (error) {
     errorText.value = displayError(error, '无法加载更早的对话。');
@@ -309,10 +210,7 @@ async function loadOlderMessages() {
   }
 }
 
-function applyMessagePage(
-  page: { items: AiChatMessageVo[]; hasMore: boolean; nextBeforeSequence: number | null } | undefined,
-  prepend: boolean
-) {
+function applyMessagePage(page: { items: AiChatMessageVo[]; hasMore: boolean; nextBeforeSequence: number | null } | undefined, prepend: boolean) {
   if (!page) return;
   hasMore.value = page.hasMore;
   nextBeforeSequence.value = page.nextBeforeSequence ?? undefined;
@@ -331,14 +229,7 @@ async function send() {
   generating.value = true;
   const clientMessageId = crypto.randomUUID().toLowerCase();
   const temporaryId = `pending-${clientMessageId}`;
-  messages.value.push({
-    id: temporaryId,
-    role: 'USER',
-    content: text,
-    status: 'COMPLETED',
-    errorCode: null,
-    citations: []
-  });
+  messages.value.push({ id: temporaryId, role: 'USER', content: text, status: 'COMPLETED', errorCode: null });
   draft.value = '';
   void scrollMessagesToBottom();
   abortController = new AbortController();
@@ -368,25 +259,13 @@ function handleStreamEvent(event: AiStreamEvent, temporaryUserId: string) {
       message.id === temporaryUserId ? { ...message, id: event.data.userMessageId } : message
     );
     generatingAssistantMessageId = event.data.assistantMessageId;
-    conversation.value = conversation.value
-      ? { ...conversation.value, generatingAssistantMessageId }
-      : conversation.value;
-    messages.value.push({
-      id: event.data.assistantMessageId,
-      role: 'ASSISTANT',
-      content: '',
-      status: 'GENERATING',
-      errorCode: null,
-      citations: []
-    });
+    conversation.value = conversation.value ? { ...conversation.value, generatingAssistantMessageId } : conversation.value;
+    messages.value.push({ id: event.data.assistantMessageId, role: 'ASSISTANT', content: '', status: 'GENERATING', errorCode: null });
   } else {
     const message = messages.value.find(item => item.id === event.data.assistantMessageId);
     if (!message) return;
     if (event.event === 'message.delta') message.content += event.data.delta;
-    if (event.event === 'message.completed') {
-      message.status = 'COMPLETED';
-      message.citations = event.data.citations ?? [];
-    }
+    if (event.event === 'message.completed') message.status = 'COMPLETED';
     if (event.event === 'message.failed') {
       message.status = 'FAILED';
       message.content = '';
@@ -406,8 +285,7 @@ async function stopGeneration() {
 
 async function cancelActiveGeneration(showFailure = false) {
   const conversationId = conversation.value?.conversationId;
-  const assistantMessageId =
-    generatingAssistantMessageId ?? conversation.value?.generatingAssistantMessageId ?? undefined;
+  const assistantMessageId = generatingAssistantMessageId ?? conversation.value?.generatingAssistantMessageId ?? undefined;
   abortController?.abort();
   if (!conversationId || !assistantMessageId) return;
   try {
@@ -445,54 +323,7 @@ function safeMarkdown(content: string) {
 }
 
 function toUiMessage(message: AiChatMessageVo): UiMessage {
-  return {
-    id: message.id,
-    role: message.role,
-    content: message.content,
-    status: message.status,
-    errorCode: message.errorCode,
-    citations: message.citations ?? []
-  };
-}
-
-function citationKey(citation: AiCitation) {
-  return [
-    citation.textbookId,
-    citation.edition,
-    citation.headingPath.join('/'),
-    citation.pageStart,
-    citation.pageEnd
-  ].join(':');
-}
-
-function uniqueCitations(citations: AiCitation[]) {
-  return [...new Map(citations.map(citation => [citationKey(citation), citation])).values()];
-}
-
-function citationLocation(citation: AiCitation) {
-  const heading = citation.headingPath.filter(Boolean).join(' / ');
-  const pages = citation.pageStart
-    ? citation.pageEnd && citation.pageEnd !== citation.pageStart
-      ? `第 ${citation.pageStart}–${citation.pageEnd} 页`
-      : `第 ${citation.pageStart} 页`
-    : '';
-  return [heading, pages].filter(Boolean).join(' · ') || '查看教材原文';
-}
-
-async function openCitation(citation: AiCitation) {
-  readingCitation.value = citation;
-  if (await refreshPdfReader()) pdfDialogVisible.value = true;
-}
-
-async function refreshPdfReader(): Promise<boolean> {
-  if (!readingCitation.value) return false;
-  try {
-    pdfReader.value = await getLearningTextbookPdfReader(readingCitation.value.textbookId);
-    return true;
-  } catch (error) {
-    errorText.value = displayError(error, '教材原文暂时无法打开。');
-    return false;
-  }
+  return { id: message.id, role: message.role, content: message.content, status: message.status, errorCode: message.errorCode };
 }
 
 function displayError(error: unknown, fallback: string) {
@@ -512,22 +343,10 @@ async function scrollMessagesToBottom(force = true) {
 
 function startDrag(event: PointerEvent) {
   if (event.button !== 0) return;
-  const element = (event.currentTarget as HTMLElement).closest(
-    '.ai-question-coach, .ai-question-coach__trigger'
-  ) as HTMLElement | null;
+  const element = (event.currentTarget as HTMLElement).closest('.ai-question-coach, .ai-question-coach__trigger') as HTMLElement | null;
   if (!element) return;
   const rect = element.getBoundingClientRect();
-  drag = {
-    element,
-    originLeft: rect.left,
-    originTop: rect.top,
-    offsetX: event.clientX - rect.left,
-    offsetY: event.clientY - rect.top,
-    width: rect.width,
-    height: rect.height,
-    startX: event.clientX,
-    startY: event.clientY
-  };
+  drag = { element, originLeft: rect.left, originTop: rect.top, offsetX: event.clientX - rect.left, offsetY: event.clientY - rect.top, width: rect.width, height: rect.height, startX: event.clientX, startY: event.clientY };
   pendingPosition = { left: rect.left, top: rect.top };
   wasDragged = false;
   element.classList.add('is-dragging');
@@ -576,260 +395,37 @@ function clampToViewport() {
 </script>
 
 <style scoped lang="scss">
-.ai-question-coach__stem-button {
-  margin: 16px 0 0 12px;
-  vertical-align: middle;
-}
-.ai-question-coach,
-.ai-question-coach__trigger {
-  position: fixed;
-  z-index: 2200;
-  left: 24px;
-  top: 12.5vh;
-}
-.ai-question-coach {
-  display: flex;
-  width: 25vw;
-  height: 75vh;
-  min-width: 320px;
-  min-height: 420px;
-  flex-direction: column;
-  overflow: visible;
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 12px;
-  background: var(--el-bg-color);
-  box-shadow: 0 14px 34px rgb(15 23 42 / 18%);
-}
-.ai-question-coach__drag-edge {
-  position: absolute;
-  z-index: 2;
-  touch-action: none;
-  user-select: none;
-}
-.ai-question-coach__drag-edge--top,
-.ai-question-coach__drag-edge--bottom {
-  right: 0;
-  left: 0;
-  height: 16px;
-  cursor: grab;
-}
-.ai-question-coach__drag-edge--top {
-  top: -8px;
-}
-.ai-question-coach__drag-edge--bottom {
-  bottom: -8px;
-}
-.ai-question-coach__drag-edge--right,
-.ai-question-coach__drag-edge--left {
-  top: 0;
-  bottom: 0;
-  width: 16px;
-  cursor: grab;
-}
-.ai-question-coach__drag-edge--right {
-  right: -8px;
-}
-.ai-question-coach__drag-edge--left {
-  left: -8px;
-}
-.ai-question-coach__drag-edge:active,
-.ai-question-coach__trigger:active {
-  cursor: grabbing;
-}
-.ai-question-coach__header {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 20px 14px 12px;
-  border-bottom: 1px solid var(--el-border-color-lighter);
-  box-shadow: 0 5px 12px rgb(15 23 42 / 8%);
-}
-.ai-question-coach__title {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 9px;
-}
-.ai-question-coach__title svg {
-  color: var(--el-color-primary);
-}
-.ai-question-coach__title strong,
-.ai-question-coach__title small {
-  display: block;
-}
-.ai-question-coach__title small {
-  margin-top: 2px;
-  color: var(--el-text-color-secondary);
-  font-size: 11px;
-}
-.ai-question-coach__messages {
-  display: flex;
-  min-height: 0;
-  flex: 1;
-  flex-direction: column;
-  gap: 10px;
-  overflow-y: auto;
-  padding: 14px;
-  background: var(--el-fill-color-lighter);
-}
-.ai-question-coach__load-more {
-  align-self: center;
-}
-.ai-question-coach__message {
-  max-width: 92%;
-  padding: 10px 12px;
-  border-radius: 10px;
-  font-size: 13px;
-  line-height: 1.65;
-}
-.ai-question-coach__message.is-user {
-  align-self: flex-end;
-  color: var(--el-color-white);
-  background: var(--el-color-primary);
-}
-.ai-question-coach__message.is-assistant {
-  align-self: flex-start;
-  background: var(--el-bg-color);
-  box-shadow: 0 1px 2px rgb(15 23 42 / 8%);
-}
-.ai-question-coach__message strong {
-  display: block;
-  margin-bottom: 4px;
-  font-size: 12px;
-}
-.ai-question-coach__message p {
-  margin: 0;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-.ai-question-coach__message small {
-  display: block;
-  margin-top: 6px;
-  opacity: 0.75;
-}
-.ai-question-coach__markdown :deep(p) {
-  margin: 0 0 8px;
-}
-.ai-question-coach__markdown :deep(p:last-child) {
-  margin-bottom: 0;
-}
-.ai-question-coach__markdown :deep(pre) {
-  overflow-x: auto;
-  padding: 8px;
-  border-radius: 6px;
-  background: var(--el-fill-color-light);
-}
-.ai-question-coach__sources {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-top: 10px;
-  padding-top: 9px;
-  border-top: 1px solid var(--el-border-color-lighter);
-}
-.ai-question-coach__sources-title {
-  color: var(--el-text-color-secondary);
-  font-size: 11px;
-  font-weight: 600;
-}
-.ai-question-coach__source {
-  display: flex;
-  width: 100%;
-  align-items: flex-start;
-  gap: 7px;
-  padding: 7px 8px;
-  border: 0;
-  border-radius: 7px;
-  color: var(--el-text-color-primary);
-  background: var(--el-fill-color-light);
-  text-align: left;
-  cursor: pointer;
-}
-.ai-question-coach__source:hover {
-  color: var(--el-color-primary);
-  background: var(--el-color-primary-light-9);
-}
-.ai-question-coach__source:focus-visible {
-  outline: 2px solid var(--el-color-primary);
-  outline-offset: 2px;
-}
-.ai-question-coach__source > svg {
-  width: 14px;
-  height: 14px;
-  flex: 0 0 auto;
-  margin-top: 2px;
-  color: var(--el-color-primary);
-}
-.ai-question-coach__source > span {
-  min-width: 0;
-}
-.ai-question-coach__source strong,
-.ai-question-coach__source small {
-  display: block;
-  margin: 0;
-}
-.ai-question-coach__source strong {
-  overflow: hidden;
-  font-size: 11px;
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.ai-question-coach__source small {
-  margin-top: 2px;
-  color: var(--el-text-color-regular);
-  font-size: 10px;
-  line-height: 1.45;
-}
-.ai-question-coach__composer {
-  position: relative;
-  z-index: 1;
-  padding: 10px 12px 12px;
-  border-top: 1px solid var(--el-border-color-lighter);
-  background: var(--el-bg-color);
-  box-shadow: 0 -5px 12px rgb(15 23 42 / 8%);
-}
-.ai-question-coach__composer > p {
-  margin: 0 0 8px;
-  color: var(--el-text-color-secondary);
-  font-size: 11px;
-  line-height: 1.5;
-}
-.ai-question-coach__composer-actions {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 8px;
-}
-.ai-question-coach__trigger {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 10px 15px;
-  border: 1px solid var(--el-color-primary);
-  border-radius: 22px;
-  color: var(--el-color-white);
-  background: var(--el-color-primary);
-  box-shadow: 0 10px 24px rgb(64 158 255 / 30%);
-  cursor: pointer;
-  touch-action: none;
-  user-select: none;
-}
-.is-dragging {
-  transition: none;
-}
-@media (max-width: 768px) {
-  .ai-question-coach {
-    left: 12px;
-    top: 12px;
-    width: calc(100vw - 24px);
-    height: 75vh;
-    min-width: 0;
-  }
-  .ai-question-coach__trigger {
-    left: 12px;
-  }
-}
+.ai-question-coach__stem-button { margin: 16px 0 0 12px; vertical-align: middle; }
+.ai-question-coach, .ai-question-coach__trigger { position: fixed; z-index: 2200; left: 24px; top: 12.5vh; }
+.ai-question-coach { display: flex; width: 25vw; height: 75vh; min-width: 320px; min-height: 420px; flex-direction: column; overflow: visible; border: 1px solid var(--el-border-color-light); border-radius: 12px; background: var(--el-bg-color); box-shadow: 0 14px 34px rgb(15 23 42 / 18%); }
+.ai-question-coach__drag-edge { position: absolute; z-index: 2; touch-action: none; user-select: none; }
+.ai-question-coach__drag-edge--top, .ai-question-coach__drag-edge--bottom { right: 0; left: 0; height: 16px; cursor: grab; }
+.ai-question-coach__drag-edge--top { top: -8px; }
+.ai-question-coach__drag-edge--bottom { bottom: -8px; }
+.ai-question-coach__drag-edge--right, .ai-question-coach__drag-edge--left { top: 0; bottom: 0; width: 16px; cursor: grab; }
+.ai-question-coach__drag-edge--right { right: -8px; }
+.ai-question-coach__drag-edge--left { left: -8px; }
+.ai-question-coach__drag-edge:active, .ai-question-coach__trigger:active { cursor: grabbing; }
+.ai-question-coach__header { position: relative; z-index: 1; display: flex; align-items: center; justify-content: space-between; padding: 20px 14px 12px; border-bottom: 1px solid var(--el-border-color-lighter); box-shadow: 0 5px 12px rgb(15 23 42 / 8%); }
+.ai-question-coach__title { display: flex; min-width: 0; align-items: center; gap: 9px; }
+.ai-question-coach__title svg { color: var(--el-color-primary); }
+.ai-question-coach__title strong, .ai-question-coach__title small { display: block; }
+.ai-question-coach__title small { margin-top: 2px; color: var(--el-text-color-secondary); font-size: 11px; }
+.ai-question-coach__messages { display: flex; min-height: 0; flex: 1; flex-direction: column; gap: 10px; overflow-y: auto; padding: 14px; background: var(--el-fill-color-lighter); }
+.ai-question-coach__load-more { align-self: center; }
+.ai-question-coach__message { max-width: 92%; padding: 10px 12px; border-radius: 10px; font-size: 13px; line-height: 1.65; }
+.ai-question-coach__message.is-user { align-self: flex-end; color: var(--el-color-white); background: var(--el-color-primary); }
+.ai-question-coach__message.is-assistant { align-self: flex-start; background: var(--el-bg-color); box-shadow: 0 1px 2px rgb(15 23 42 / 8%); }
+.ai-question-coach__message strong { display: block; margin-bottom: 4px; font-size: 12px; }
+.ai-question-coach__message p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.ai-question-coach__message small { display: block; margin-top: 6px; opacity: .75; }
+.ai-question-coach__markdown :deep(p) { margin: 0 0 8px; }
+.ai-question-coach__markdown :deep(p:last-child) { margin-bottom: 0; }
+.ai-question-coach__markdown :deep(pre) { overflow-x: auto; padding: 8px; border-radius: 6px; background: var(--el-fill-color-light); }
+.ai-question-coach__composer { position: relative; z-index: 1; padding: 10px 12px 12px; border-top: 1px solid var(--el-border-color-lighter); background: var(--el-bg-color); box-shadow: 0 -5px 12px rgb(15 23 42 / 8%); }
+.ai-question-coach__composer > p { margin: 0 0 8px; color: var(--el-text-color-secondary); font-size: 11px; line-height: 1.5; }
+.ai-question-coach__composer-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
+.ai-question-coach__trigger { display: flex; align-items: center; gap: 7px; padding: 10px 15px; border: 1px solid var(--el-color-primary); border-radius: 22px; color: var(--el-color-white); background: var(--el-color-primary); box-shadow: 0 10px 24px rgb(64 158 255 / 30%); cursor: pointer; touch-action: none; user-select: none; }
+.is-dragging { transition: none; }
+@media (max-width: 768px) { .ai-question-coach { left: 12px; top: 12px; width: calc(100vw - 24px); height: 75vh; min-width: 0; } .ai-question-coach__trigger { left: 12px; } }
 </style>

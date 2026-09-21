@@ -1,0 +1,9 @@
+# Keep pipelines disabled while project-level Auto DevOps remains enabled.
+# This file can be deleted after a Maintainer disables Auto DevOps in GitLab.
+workflow:
+  rules:
+    - when: never
+
+ci_disabled:
+  script:
+    - echo "GitLab CI is disabled for this project."

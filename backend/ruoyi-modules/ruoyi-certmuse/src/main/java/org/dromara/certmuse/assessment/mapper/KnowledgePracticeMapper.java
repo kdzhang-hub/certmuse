@@ -11,7 +11,6 @@ import org.dromara.certmuse.assessment.domain.KnowledgePracticeIdempotencyRow;
 import org.dromara.certmuse.assessment.domain.KnowledgePracticeNodeRow;
 import org.dromara.certmuse.assessment.domain.KnowledgePracticeQuestionRow;
 import org.dromara.certmuse.assessment.domain.KnowledgePracticeSessionRow;
-import org.dromara.certmuse.assessment.domain.ReinforcementRoundRow;
 
 /** PostgreSQL persistence for recursive U08 reads and atomic session creation. */
 public interface KnowledgePracticeMapper {
@@ -91,28 +90,4 @@ public interface KnowledgePracticeMapper {
     int submitAnsweringSession(@Param("sessionId") long sessionId, @Param("userId") long userId);
     int settleAnsweringSession(@Param("sessionId") long sessionId, @Param("userId") long userId);
     int completeAnsweringSession(@Param("sessionId") long sessionId, @Param("userId") long userId);
-    int insertInitialReinforcement(@Param("id") long id, @Param("userId") long userId,
-                                   @Param("sessionId") long sessionId, @Param("questionOrder") int questionOrder,
-                                   @Param("correct") boolean correct);
-    ReinforcementRoundRow selectReinforcementBySource(@Param("userId") long userId,
-                                                       @Param("sessionId") long sessionId,
-                                                       @Param("questionOrder") int questionOrder);
-    ReinforcementRoundRow selectReinforcementRound(@Param("roundId") long roundId, @Param("userId") long userId);
-    ReinforcementRoundRow lockReinforcementRound(@Param("roundId") long roundId, @Param("userId") long userId);
-    int updateReinforcementRecommendation(@Param("roundId") long roundId, @Param("status") String status,
-                                          @Param("reason") String reason, @Param("source") String source,
-                                          @Param("estimatedCount") int estimatedCount,
-                                          @Param("errorCode") String errorCode);
-    int dismissReinforcement(@Param("roundId") long roundId, @Param("userId") long userId);
-    List<KnowledgePracticeQuestionRow> selectReinforcementCandidates(@Param("round") ReinforcementRoundRow round,
-                                                                      @Param("syllabusVersionId") long syllabusVersionId);
-    int insertReinforcementSession(@Param("id") long id, @Param("round") ReinforcementRoundRow round,
-                                   @Param("ruleVersionId") long ruleVersionId, @Param("requestId") String requestId);
-    int startReinforcementRound(@Param("roundId") long roundId, @Param("userId") long userId,
-                                @Param("sessionId") long sessionId, @Param("requestId") String requestId,
-                                @Param("count") int count);
-    int completeReinforcementRound(@Param("sessionId") long sessionId, @Param("userId") long userId);
-    int insertNextReinforcement(@Param("id") long id, @Param("previous") ReinforcementRoundRow previous,
-                                @Param("requestId") String requestId);
-    List<org.dromara.certmuse.assessment.domain.KnowledgePracticeNavigationRow> selectReinforcementResults(long roundId);
 }

@@ -43,6 +43,12 @@
           </div>
           <span class="app-name">TopIam</span>
         </a>
+        <a class="third-app" href="#" title="使用 Gitee 账号授权登录" @click="authUrl('gitee')">
+          <div class="third-app__icon">
+            <svg-icon icon-class="gitee" />
+          </div>
+          <span class="app-name">Gitee</span>
+        </a>
         <a class="third-app" href="#" title="使用 GitHub 账号授权登录" @click="authUrl('github')">
           <div class="third-app__icon">
             <svg-icon icon-class="github" />

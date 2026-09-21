@@ -24,11 +24,7 @@ export async function getPaperImportQualifications(): Promise<QualificationVO[]>
 
 export function createPaperImport(form: PaperImportCreateForm): AxiosPromise<PaperImportBatchVO> {
   const data = new FormData();
-  if (form.files?.length) {
-    form.files.forEach(file => data.append('files', file));
-  } else if (form.file) {
-    data.append('file', form.file);
-  }
+  data.append('file', form.file);
   data.append('collectionName', form.collectionName);
   data.append('collectionType', form.collectionType);
   data.append('durationMinutes', String(form.durationMinutes));

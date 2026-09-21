@@ -8,9 +8,6 @@ import org.dromara.certmuse.assessment.domain.vo.KnowledgePracticeSetupVo;
 import org.dromara.certmuse.assessment.domain.vo.KnowledgePracticeSessionVo;
 import org.dromara.certmuse.assessment.domain.vo.KnowledgePracticeItemVo;
 import org.dromara.certmuse.assessment.domain.vo.StartKnowledgePracticeVo;
-import org.dromara.certmuse.assessment.domain.vo.ReinforcementSuggestionVo;
-import org.dromara.certmuse.assessment.domain.vo.ReinforcementRoundVo;
-import org.dromara.certmuse.assessment.domain.vo.ReinforcementResultVo;
 
 /** Learner-facing U08 knowledge-practice use case. */
 public interface KnowledgePracticeService {
@@ -32,11 +29,4 @@ public interface KnowledgePracticeService {
 
     /** Ends an owned self-practice session without creating facts for unanswered items. */
     CompleteKnowledgePracticeVo complete(long userId, long sessionId, String requestId);
-
-    ReinforcementSuggestionVo reinforcement(long userId, long sessionId, int questionOrder);
-    void dismissReinforcement(long userId, long sessionId, int questionOrder);
-    ReinforcementRoundVo createReinforcement(long userId, long sessionId, int questionOrder, String requestId);
-    ReinforcementRoundVo reinforcementRound(long userId, long roundId);
-    ReinforcementRoundVo continueReinforcement(long userId, long roundId, String requestId);
-    ReinforcementResultVo reinforcementResult(long userId, long roundId);
 }

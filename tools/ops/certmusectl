@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+command=${1:-}
+
+case "$command" in
+  install)
+    exec "$script_dir/install-agent-tools.sh"
+    ;;
+  doctor)
+    exec "$script_dir/doctor.sh"
+    ;;
+  deployer)
+    shift
+    runtime_dir="$script_dir/local/routeflow/tools/deployer"
+    cd "$runtime_dir"
+    exec "$runtime_dir/deployer" "$@"
+    ;;
+  srv-ops-import)
+    shift
+    exec "$script_dir/import-srv-ops-backup.sh" "$@"
+    ;;
+  srv-ops-backup)
+    shift
+    exec "$script_dir/backup-srv-ops-profile.sh" "$@"
+    ;;
+  references)
+    shift
+    exec "$script_dir/sync-reference-material.sh" "$@"
+    ;;
+  *)
+    echo "Usage: certmusectl {install|doctor|deployer <args...>|srv-ops-backup [args...]|srv-ops-import [args...]|references <push|pull> <source|work|archive> <relative-file>}" >&2
+    exit 2
+    ;;
+esac

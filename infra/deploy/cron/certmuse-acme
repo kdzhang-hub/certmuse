@@ -1,0 +1,5 @@
+SHELL=/bin/sh
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+
+# acme.sh uses the stored reload command after a successful renewal.
+17 3 * * * root /usr/bin/acme.sh --cron --home /root/.acme.sh >/dev/null 2>&1

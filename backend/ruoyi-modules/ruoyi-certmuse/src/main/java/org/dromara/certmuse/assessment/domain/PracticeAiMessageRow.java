@@ -16,7 +16,6 @@ public class PracticeAiMessageRow {
     private String answerDisclosureMode;
     private String errorCode;
     private String clientMessageId;
-    private String citations;
     private OffsetDateTime createTime;
     private OffsetDateTime completedTime;
     private Long ownerUserId;

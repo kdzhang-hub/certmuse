@@ -1,11 +1,14 @@
 {
   "$schema": "https://json.schemastore.org/package",
-  "name": "certmuse-admin",
+  "name": "ruoyi-vue-plus",
   "version": "6.0.0-BETA",
-  "description": "CertMuse administrator web application",
+  "description": "RuoYi-Vue-Plus后台管理系统",
   "license": "MIT",
-  "author": "CertMuse contributors",
-  "packageManager": "pnpm@10.34.5",
+  "author": "LionLi",
+  "repository": {
+    "type": "git",
+    "url": "https://gitee.com/JavaLionLi/plus-ui.git"
+  },
   "type": "module",
   "scripts": {
     "build": "vite build --mode production",
@@ -16,6 +19,9 @@
     "lint": "oxlint src",
     "lint:fix": "oxlint --fix src",
     "preview": "vite preview",
+    "test:unit": "vitest run",
+    "test:ci": "vitest run --coverage --reporter=default --reporter=junit --outputFile.junit=reports/junit.xml",
+    "test:coverage": "vitest run --coverage",
     "typecheck": "vue-tsc --noEmit"
   },
   "dependencies": {
@@ -54,8 +60,11 @@
     "@unocss/preset-attributify": "66.7.5",
     "@unocss/preset-wind3": "66.7.5",
     "@vitejs/plugin-vue": "^6.0.8",
+    "@vitest/coverage-v8": "^4.1.10",
     "@vue/compiler-sfc": "3.5.40",
+    "@vue/test-utils": "^2.4.11",
     "autoprefixer": "10.5.3",
+    "jsdom": "^30.0.1",
     "oxfmt": "^0.59.0",
     "oxlint": "^1.74.0",
     "oxlint-tsgolint": "^0.24.0",
@@ -67,6 +76,7 @@
     "unplugin-vue-setup-extend-plus": "1.0.1",
     "vite": "^8.1.5",
     "vite-plugin-svg-icons-ng": "^1.9.2",
+    "vitest": "4.1.10",
     "vue-tsc": "^3.3.7"
   },
   "browserslist": [

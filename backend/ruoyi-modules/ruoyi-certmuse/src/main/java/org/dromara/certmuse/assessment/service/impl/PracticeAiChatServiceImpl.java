@@ -19,13 +19,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.certmuse.ai.client.AiGenerationHandle;
+import org.dromara.certmuse.ai.client.AiModelClient;
 import org.dromara.certmuse.ai.client.AiModelStreamListener;
 import org.dromara.certmuse.ai.config.CertMuseAiProperties;
-import org.dromara.certmuse.ai.domain.AiAgentExecution;
-import org.dromara.certmuse.ai.domain.AiAgentRequest;
-import org.dromara.certmuse.ai.domain.AiAgentTaskType;
-import org.dromara.certmuse.ai.domain.AiCitation;
-import org.dromara.certmuse.agent.service.AiAgentExecutor;
 import org.dromara.certmuse.assessment.domain.PracticeAiConversationRow;
 import org.dromara.certmuse.assessment.domain.PracticeAiIdempotencyRow;
 import org.dromara.certmuse.assessment.domain.PracticeAiMessageRow;
@@ -49,7 +45,6 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
-import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /** Coordinates persistent question AI conversations and provider streams. */
@@ -66,7 +61,7 @@ public class PracticeAiChatServiceImpl implements PracticeAiChatService {
     private final PracticeAiContextAssembler contextAssembler;
     private final PracticeAiContentSafetyPolicy contentSafety;
     private final PracticeAiQuota quota;
-    private final AiAgentExecutor agentExecutor;
+    private final AiModelClient modelClient;
     private final ObjectMapper objectMapper;
     private final TransactionTemplate transactionTemplate;
     private final ScheduledExecutorService practiceAiScheduler;
@@ -146,15 +141,11 @@ public class PracticeAiChatServiceImpl implements PracticeAiChatService {
         if (!quota.acquireSlot(userId, assistantMessageId)) {
             throw limited(409, "AI_CHAT_GENERATION_IN_PROGRESS", "CONCURRENT_GENERATION", 1);
         }
-        AiAgentExecution execution;
         try {
             if (!quota.acquireMinute(userId)) throw limited(429, "AI_CHAT_RATE_LIMITED", "USER_MINUTE", 60);
             if (!quota.acquireDay(userId)) {
                 throw limited(429, "AI_CHAT_RATE_LIMITED", "USER_DAY", quota.secondsUntilNextDay());
             }
-            execution = agentExecutor.prepare(new AiAgentRequest(AiAgentTaskType.QUESTION_EXPLANATION,
-                "cm_ai_message", assistantMessageId, modelContext.knowledgePointIds(),
-                modelContext.retrievalQuery(), modelContext.request()));
             transactionTemplate.executeWithoutResult(status -> prepareMessages(
                 userId, conversationId, userMessageId, assistantMessageId, message,
                 command.clientMessageId(), mode));
@@ -162,7 +153,7 @@ public class PracticeAiChatServiceImpl implements PracticeAiChatService {
             quota.releaseSlot(userId, assistantMessageId);
             throw exception;
         }
-        return startStream(userId, conversationId, userMessageId, assistantMessageId, mode, modelContext, execution);
+        return startStream(userId, conversationId, userMessageId, assistantMessageId, mode, modelContext);
     }
 
     @Override
@@ -213,10 +204,9 @@ public class PracticeAiChatServiceImpl implements PracticeAiChatService {
     }
 
     private SseEmitter startStream(long userId, long conversationId, long userMessageId,
-                                   long assistantMessageId, String mode, PracticeAiContext context,
-                                   AiAgentExecution execution) {
+                                   long assistantMessageId, String mode, PracticeAiContext context) {
         SseEmitter emitter = new SseEmitter(properties.getTotalTimeout().plusSeconds(30).toMillis());
-        ActiveGeneration generation = new ActiveGeneration(userId, assistantMessageId, emitter, execution.citations());
+        ActiveGeneration generation = new ActiveGeneration(userId, assistantMessageId, emitter);
         active.put(assistantMessageId, generation);
         emitter.onTimeout(() -> fail(generation, "AI_PROVIDER_TIMEOUT", true, null));
         emitter.onError(error -> fail(generation, "AI_CHAT_SYSTEM_FAILURE", true, error));
@@ -233,7 +223,7 @@ public class PracticeAiChatServiceImpl implements PracticeAiChatService {
             "userMessageId", String.valueOf(userMessageId),
             "assistantMessageId", String.valueOf(assistantMessageId),
             "answerDisclosureMode", mode));
-        AiGenerationHandle handle = agentExecutor.stream(execution, new AiModelStreamListener() {
+        AiGenerationHandle handle = modelClient.stream(context.request(), new AiModelStreamListener() {
             @Override
             public void onDelta(String delta) {
                 if (generation.terminal.get() || delta == null || delta.isEmpty()) return;
@@ -273,13 +263,12 @@ public class PracticeAiChatServiceImpl implements PracticeAiChatService {
 
     private void complete(ActiveGeneration generation, String finishReason) {
         if (!generation.terminal.compareAndSet(false, true)) return;
-        mapper.completeAssistantMessage(generation.messageId, generation.content.toString(), json(generation.citations));
+        mapper.completeAssistantMessage(generation.messageId, generation.content.toString());
         sendTerminal(generation, "message.completed", Map.of(
             "assistantMessageId", String.valueOf(generation.messageId),
             "status", "COMPLETED",
             "finishReason", finishReason == null ? "STOP" : finishReason,
             "contentLength", contentLength(generation.content),
-            "citations", generation.citations,
             "completedAt", java.time.OffsetDateTime.now().toString()));
     }
 
@@ -390,31 +379,7 @@ public class PracticeAiChatServiceImpl implements PracticeAiChatService {
 
     private PracticeAiMessageVo messageVo(PracticeAiMessageRow row) {
         return new PracticeAiMessageVo(String.valueOf(row.getId()), row.getSequenceNo(), row.getRole(), row.getContent(),
-            row.getStatus(), row.getAnswerDisclosureMode(), row.getErrorCode(), row.getCreateTime(), row.getCompletedTime(),
-            citations(row.getCitations()));
-    }
-
-    private List<PracticeAiMessageVo.CitationVo> citations(String value) {
-        if (value == null || value.isBlank()) return List.of();
-        try {
-            return objectMapper.readTree(value).valueStream().map(node -> new PracticeAiMessageVo.CitationVo(
-                node.path("textbookId").asText(), node.path("textbookTitle").asText(),
-                nullableText(node, "edition"),
-                node.path("headingPath").valueStream().map(item -> item.asText()).toList(),
-                nullableInteger(node, "pageStart"), nullableInteger(node, "pageEnd"))).toList();
-        } catch (Exception exception) {
-            throw systemFailure("AI引用数据损坏", exception);
-        }
-    }
-
-    private String nullableText(JsonNode node, String field) {
-        JsonNode value = node.path(field);
-        return value.isMissingNode() || value.isNull() ? null : value.asText();
-    }
-
-    private Integer nullableInteger(JsonNode node, String field) {
-        JsonNode value = node.path(field);
-        return value.isMissingNode() || value.isNull() ? null : value.asInt();
+            row.getStatus(), row.getAnswerDisclosureMode(), row.getErrorCode(), row.getCreateTime(), row.getCompletedTime());
     }
 
     private CreatePracticeAiConversationVo replayCreate(PracticeAiIdempotencyRow action, String requestHash,
@@ -500,7 +465,6 @@ public class PracticeAiChatServiceImpl implements PracticeAiChatService {
         private final long userId;
         private final long messageId;
         private final SseEmitter emitter;
-        private final List<AiCitation> citations;
         private final AtomicBoolean terminal = new AtomicBoolean();
         private final AtomicBoolean firstToken = new AtomicBoolean();
         private final AtomicInteger eventSequence = new AtomicInteger();
@@ -509,11 +473,10 @@ public class PracticeAiChatServiceImpl implements PracticeAiChatService {
         private volatile ScheduledFuture<?> heartbeat;
         private volatile ScheduledFuture<?> firstTokenTimeout;
 
-        private ActiveGeneration(long userId, long messageId, SseEmitter emitter, List<AiCitation> citations) {
+        private ActiveGeneration(long userId, long messageId, SseEmitter emitter) {
             this.userId = userId;
             this.messageId = messageId;
             this.emitter = emitter;
-            this.citations = citations == null ? List.of() : List.copyOf(citations);
         }
 
         private void cancelProvider() {

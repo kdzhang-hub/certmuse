@@ -1,0 +1,29 @@
+# Desired-state declaration for the CertMuse RouteFlow Deployer private profile.
+# The private profile owns host connectivity and credentials; it is not routed through srv-ops.
+name: certmuse
+environment: production
+
+targets:
+  application: certmuse-app
+
+workflow:
+  - preflight
+  - build
+  - upload-backend
+  - upload-frontend
+  - migrate-postgres
+  - restart-service
+  - reload-nginx
+  - health-check
+  - rollback-on-failure
+
+guardrails:
+  require_dry_run: true
+  require_health_check: true
+  deployment_layout: direct
+  deploy_paths:
+    backend: /app/certmuse/backend
+    frontend: /app/certmuse/frontend
+    practice: /app/certmuse-static/practice
+    logs: /app/certmuse/logs
+    tmp: /app/certmuse/tmp

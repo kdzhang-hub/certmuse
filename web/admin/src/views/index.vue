@@ -2,9 +2,10 @@
   <div class="home">
     <section class="hero-panel">
       <div class="hero-copy">
-        <h1>CertMuse 运营控制台</h1>
+        <h1>RuoYi-Vue-Plus 控制台</h1>
         <p>
-          统一管理认证学习内容、题库、学习任务与学习成效，为内容运营与教学协作提供清晰的工作台。
+          企业级后台管理系统 重写 RuoYi-Vue 所有功能 集成 Sa-Token、Mybatis-Plus、WarmFlow、SpringDoc、Hutool、OSS
+          等组件
         </p>
       </div>
     </section>
@@ -13,7 +14,7 @@
       <section class="section-card">
         <div class="section-head">
           <div>
-            <h2>核心工作区</h2>
+            <h2>项目矩阵</h2>
           </div>
         </div>
         <div class="product-list">
@@ -54,31 +55,31 @@
 <script setup name="Index" lang="ts">
 const products = [
   {
-    name: '内容运营',
+    name: 'RuoYi-Vue-Plus',
     version: 'v6.0.0',
-    summary: '维护课程目录、题库与认证资料，让学习内容可以持续迭代和复用。',
-    tags: ['课程', '题库', '资料'],
+    summary: '面向分布式集群场景的后台管理系统，保持现有业务接口与权限逻辑，适合先完成前端壳升级。',
+    tags: ['Vue 3', 'Element Plus', 'Spring Boot', 'Sa-Token'],
   },
   {
-    name: '学习洞察',
+    name: 'RuoYi-Cloud-Plus',
     version: 'v6.0.0',
-    summary: '查看诊断、练习与学习任务的结果，为课程优化和学习支持提供依据。',
-    tags: ['诊断', '进度', '分析'],
+    summary: '微服务通用权限管理系统，适合更复杂的服务治理场景，也可以沿用同样的前端升级思路。',
+    tags: ['Spring Cloud', 'Gateway', 'Nacos', 'Dubbo'],
   }
 ];
 
 const capabilityGroups = [
   {
-    title: '学习体验',
-    items: ['学习目标与入门引导', '诊断评估与错题复盘', '练习、任务与进度追踪']
+    title: '后端基建',
+    items: ['Spring Boot / Spring Cloud', 'Sa-Token 认证与权限', 'MySQL / Redis', '代码生成器']
   },
   {
-    title: '运营能力',
-    items: ['课程与题目维护', '学习资料与资源管理', '学习结果与反馈洞察']
+    title: '平台能力',
+    items: ['动态菜单与按钮权限', '监控、日志、在线用户', '任务调度与工作流', '文件存储与多云适配']
   },
   {
-    title: '平台基础',
-    items: ['身份认证与权限控制', '模块化服务边界', '可扩展的 AI 能力接口']
+    title: '前端方向',
+    items: ['UI 卡片化', '主题与布局统一', '通用页面容器规范化', '企业化布局']
   }
 ];
 
@@ -93,7 +94,7 @@ const capabilityGroups = [
 
 .hero-panel,
 .section-card {
-  border-radius: 8px;
+  border-radius: 28px;
   border: 1px solid var(--app-surface-border);
   background: var(--app-surface-bg);
   box-shadow: var(--app-shadow-sm);
@@ -101,8 +102,11 @@ const capabilityGroups = [
 }
 
 .hero-panel {
-  display: block;
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(280px, 0.7fr);
+  gap: 18px;
   padding: 30px;
+  background: radial-gradient(circle at top left, rgba(53, 109, 255, 0.16), transparent 30%), var(--app-surface-bg);
 }
 
 .hero-copy {
@@ -112,8 +116,9 @@ const capabilityGroups = [
 
   h1 {
     margin: 0;
-    font-size: 32px;
-    line-height: 1.25;
+    font-size: clamp(30px, 4vw, 46px);
+    line-height: 1.06;
+    letter-spacing: -0.04em;
     color: var(--app-text-title);
   }
 
@@ -156,6 +161,7 @@ const capabilityGroups = [
   strong {
     color: var(--app-text-title);
     font-size: 24px;
+    letter-spacing: -0.03em;
   }
 
   span {
@@ -204,7 +210,7 @@ const capabilityGroups = [
 
 .product-card {
   padding: 22px;
-  border-radius: 8px;
+  border-radius: 24px;
   background: var(--app-elevated-soft-bg);
   border: 1px solid var(--app-surface-border);
   transition:
@@ -229,6 +235,7 @@ const capabilityGroups = [
     margin: 0 0 8px;
     color: var(--app-text-title);
     font-size: 22px;
+    letter-spacing: -0.03em;
   }
 
   p {
@@ -256,11 +263,12 @@ const capabilityGroups = [
 }
 
 .capability-card {
+  background: radial-gradient(circle at top right, rgba(14, 165, 233, 0.12), transparent 28%), var(--app-surface-bg);
 }
 
 .capability-group {
   padding: 18px 18px 18px 20px;
-  border-radius: 8px;
+  border-radius: 22px;
   background: var(--app-elevated-soft-bg);
   border: 1px solid var(--app-surface-border);
 
@@ -309,7 +317,7 @@ const capabilityGroups = [
   .hero-panel,
   .section-card {
     padding: 20px;
-    border-radius: 8px;
+    border-radius: 22px;
   }
 
   .product-top {
@@ -317,4 +325,9 @@ const capabilityGroups = [
   }
 }
 
+html.dark {
+  .hero-panel {
+    background: radial-gradient(circle at top left, rgba(53, 109, 255, 0.18), transparent 30%), var(--app-surface-bg);
+  }
+}
 </style>

@@ -1,41 +1,6 @@
 <template>
   <div v-loading="loading" class="p-2 app-container knowledge-practice-answering">
-    <el-card v-if="reinforcementResult" shadow="never" class="reinforcement-result">
-      <el-result
-        icon="success"
-        title="本轮强化已完成"
-        :sub-title="`答对 ${reinforcementResult.correctCount}/${reinforcementResult.actualCount} 题，正确率 ${reinforcementResult.correctRate}%`"
-      />
-      <div class="reinforcement-result__items">
-        <el-tag
-          v-for="item in reinforcementResult.items"
-          :key="item.questionOrder"
-          :type="item.correct ? 'success' : 'danger'"
-        >
-          第 {{ item.questionOrder }} 题 {{ item.correct ? '正确' : '错误' }}
-        </el-tag>
-      </div>
-      <div class="reinforcement-result__actions">
-        <el-button
-          type="primary"
-          :disabled="!reinforcementResult.hasMoreCandidates"
-          :loading="submitting"
-          @click="continueReinforcement"
-        >
-          继续强化
-        </el-button>
-        <el-button @click="returnToSetup">返回原练习</el-button>
-      </div>
-      <el-alert
-        v-if="!reinforcementResult.hasMoreCandidates"
-        title="题库中暂无更多未做题"
-        type="info"
-        :closable="false"
-        show-icon
-      />
-    </el-card>
-
-    <el-result v-else-if="loadError" icon="warning" title="练习会话不可用" :sub-title="loadError">
+    <el-result v-if="loadError" icon="warning" title="练习会话不可用" :sub-title="loadError">
       <template #extra>
         <el-button type="primary" @click="returnToSetup">返回知识点练习</el-button>
       </template>
@@ -55,7 +20,7 @@
     <focus-exam-shell
       v-else-if="session && currentQuestion"
       mode="PRACTICE"
-      :title="reinforcementRoundId ? '同知识点强化 · 题库练习' : knowledgePointName"
+      :title="knowledgePointName"
       description="逐题提交后即可查看结果与解析；未提交的选择不会保存。"
       :total-count="session.totalCount"
       :answered-count="session.submittedCount"
@@ -130,12 +95,6 @@
           <template #header><strong>解析</strong></template>
           <p>{{ currentQuestion.submission.analysis }}</p>
         </el-card>
-        <reinforcement-suggestion-card
-          v-if="!reinforcementRoundId"
-          :session-id="sessionId"
-          :question-order="currentQuestion.questionOrder"
-          :submitted="Boolean(currentQuestion.submission)"
-        />
       </section>
 
       <template #navigation>
@@ -168,18 +127,14 @@ import {
   getKnowledgePracticeAnswerSession,
   getKnowledgePracticeItem,
   submitKnowledgePracticeItem,
-  continueReinforcementRound,
-  getReinforcementResult,
   type KnowledgePracticeAnswerSessionVo,
   type KnowledgePracticeErrorVo,
-  type KnowledgePracticeItemVo,
-  type ReinforcementResultVo
+  type KnowledgePracticeItemVo
 } from '@/api/certmuse/assessment/knowledge-practices';
-import AiQuestionCoachPanel from '@/components/exam/AiQuestionCoachPanel.vue';
 import ChoiceQuestion from '@/components/exam/ChoiceQuestion.vue';
+import AiQuestionCoachPanel from '@/components/exam/AiQuestionCoachPanel.vue';
 import ExamAnswerCard from '@/components/exam/ExamAnswerCard.vue';
 import FocusExamShell from '@/components/exam/FocusExamShell.vue';
-import ReinforcementSuggestionCard from '@/components/exam/ReinforcementSuggestionCard.vue';
 import { contractErrorFrom } from '@/utils/learning-goal';
 
 const setupPath = '/learning/question-bank/knowledge-practice';
@@ -191,16 +146,12 @@ const submitting = ref(false);
 const loadError = ref('');
 const session = ref<KnowledgePracticeAnswerSessionVo>();
 const currentQuestion = ref<KnowledgePracticeItemVo>();
-const reinforcementResult = ref<ReinforcementResultVo>();
 const choiceAnswers = reactive<Record<number, string[]>>({});
 const saveText = ref('');
 const saveState = ref<'saved' | 'saving' | 'failed'>('saved');
 let itemRequestSequence = 0;
 
 const sessionId = computed(() => (typeof route.query.sessionId === 'string' ? route.query.sessionId : ''));
-const reinforcementRoundId = computed(() =>
-  typeof route.query.reinforcementRoundId === 'string' ? route.query.reinforcementRoundId : ''
-);
 const knowledgePointName = computed(() => {
   const value = route.query.knowledgePointName;
   return typeof value === 'string' && value.trim() ? value.trim() : '知识点专项练习';
@@ -219,28 +170,13 @@ const answerResults = computed(() =>
   )
 );
 
-watch(
-  () => [sessionId.value, reinforcementRoundId.value, route.query.reinforcementResult] as const,
-  () => void initialize(),
-  { immediate: true }
-);
+watch(sessionId, () => void initialize(), { immediate: true });
 
 async function initialize() {
   loading.value = true;
   loadError.value = '';
   currentQuestion.value = undefined;
   saveText.value = '';
-  reinforcementResult.value = undefined;
-  if (route.query.reinforcementResult === '1' && reinforcementRoundId.value) {
-    try {
-      reinforcementResult.value = (await getReinforcementResult(reinforcementRoundId.value)).data;
-    } catch (error) {
-      loadError.value = messageForError(error, '无法加载强化结果。');
-    } finally {
-      loading.value = false;
-    }
-    return;
-  }
   if (!sessionId.value) {
     session.value = undefined;
     loadError.value = '缺少练习会话编号，请从知识点练习页重新开始。';
@@ -251,19 +187,9 @@ async function initialize() {
     const response = await getKnowledgePracticeAnswerSession(sessionId.value);
     if (!response.data) throw new Error('未取得练习会话数据。');
     session.value = response.data;
-    if (response.data.sessionStatus === 'COMPLETED') {
-      if (reinforcementRoundId.value) {
-        reinforcementResult.value = (await getReinforcementResult(reinforcementRoundId.value)).data;
-      }
-      return;
-    }
+    if (response.data.sessionStatus === 'COMPLETED') return;
     const firstUnanswered = response.data.navigation.find(item => item.state === 'UNANSWERED')?.questionOrder;
-    const requestedOrder = Number(route.query.questionOrder);
-    await loadQuestion(
-      Number.isInteger(requestedOrder) && requestedOrder > 0
-        ? requestedOrder
-        : (firstUnanswered ?? response.data.navigation[0]?.questionOrder ?? 1)
-    );
+    await loadQuestion(firstUnanswered ?? response.data.navigation[0]?.questionOrder ?? 1);
   } catch (error) {
     loadError.value = messageForError(error, '无法加载本次练习，请从知识点练习页重新开始。');
   } finally {
@@ -383,35 +309,11 @@ async function completeSession() {
   saveState.value = 'saving';
   try {
     const response = await completeKnowledgePractice(sessionId.value, crypto.randomUUID().toLowerCase());
-    if (reinforcementRoundId.value) {
-      await router.replace({
-        path: '/learning/session/practice',
-        query: {
-          sessionId: sessionId.value,
-          reinforcementRoundId: reinforcementRoundId.value,
-          reinforcementResult: '1'
-        }
-      });
-    } else {
-      await router.replace(response.data?.returnPath ?? setupPath);
-    }
+    await router.replace(response.data?.returnPath ?? setupPath);
   } catch (error) {
     saveText.value = '结束失败';
     saveState.value = 'failed';
     await handlePracticeError(error);
-  } finally {
-    submitting.value = false;
-  }
-}
-
-async function continueReinforcement() {
-  if (!reinforcementResult.value?.hasMoreCandidates || !reinforcementRoundId.value) return;
-  submitting.value = true;
-  try {
-    const response = await continueReinforcementRound(reinforcementRoundId.value, crypto.randomUUID().toLowerCase());
-    if (response.data?.answerPath) await router.replace(response.data.answerPath);
-  } catch (error) {
-    ElMessage.error(messageForError(error, '暂时无法继续强化。'));
   } finally {
     submitting.value = false;
   }
@@ -447,7 +349,7 @@ function messageForError(error: unknown, fallback: string) {
 }
 
 function returnToSetup() {
-  void router.replace(reinforcementResult.value?.returnPath ?? session.value?.returnPath ?? setupPath);
+  void router.replace(session.value?.returnPath ?? setupPath);
 }
 </script>
 
@@ -471,16 +373,5 @@ function returnToSetup() {
   color: var(--el-text-color-regular);
   line-height: 1.8;
   white-space: pre-line;
-}
-.reinforcement-result {
-  max-width: 760px;
-  margin: 32px auto;
-}
-.reinforcement-result__items,
-.reinforcement-result__actions {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin: 16px 0;
 }
 </style>

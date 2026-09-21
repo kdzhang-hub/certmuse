@@ -1,0 +1,585 @@
+{
+  "schemaVersion": "knowledge-point-jsonl-test-manifest/1.0",
+  "generatedAt": "2026-07-31T02:32:02.953Z",
+  "source": "target/knowledge_point_v7.jsonl",
+  "baselineLineCount": 1001,
+  "combinedLineCount": 1069,
+  "appendedCaseCount": 68,
+  "baselineSha256": "51507aef9d3abefee09fabc64b0b381ce7301e86bd0234f32afd2febde07cc90",
+  "subjectMappingForIntegration": [
+    {
+      "subjectNo": 1,
+      "examSubjectId": "<replace-with-seeded-subject-id-1>"
+    },
+    {
+      "subjectNo": 2,
+      "examSubjectId": "<replace-with-seeded-subject-id-2>"
+    },
+    {
+      "subjectNo": 3,
+      "examSubjectId": "<replace-with-seeded-subject-id-3>"
+    }
+  ],
+  "cases": [
+    {
+      "id": "valid-unicode-title",
+      "lineNo": 1002,
+      "expectedIssueCodes": [],
+      "note": "合法Unicode与Emoji标题"
+    },
+    {
+      "id": "valid-title-length-500",
+      "lineNo": 1003,
+      "expectedIssueCodes": [],
+      "note": "标题长度上边界500"
+    },
+    {
+      "id": "schema-number",
+      "lineNo": 1004,
+      "expectedIssueCodes": [
+        "KP_FIELD_TYPE_INVALID"
+      ],
+      "note": "schema_version错误类型"
+    },
+    {
+      "id": "schema-unsupported",
+      "lineNo": 1005,
+      "expectedIssueCodes": [
+        "KP_SCHEMA_VERSION_UNSUPPORTED"
+      ],
+      "note": "不支持的Schema"
+    },
+    {
+      "id": "missing-required-field",
+      "lineNo": 1006,
+      "expectedIssueCodes": [
+        "KP_REQUIRED_FIELD_MISSING"
+      ],
+      "note": "缺少必填status"
+    },
+    {
+      "id": "unknown-field",
+      "lineNo": 1007,
+      "expectedIssueCodes": [
+        "KP_UNKNOWN_FIELD"
+      ],
+      "note": "严格白名单未知字段"
+    },
+    {
+      "id": "forbidden-server-id",
+      "lineNo": 1008,
+      "expectedIssueCodes": [
+        "KP_UNKNOWN_FIELD"
+      ],
+      "note": "禁止上传服务端id"
+    },
+    {
+      "id": "source-key-empty",
+      "lineNo": 1009,
+      "expectedIssueCodes": [
+        "KP_SOURCE_KEY_INVALID"
+      ],
+      "note": "source_key空字符串"
+    },
+    {
+      "id": "source-key-leading-space",
+      "lineNo": 1010,
+      "expectedIssueCodes": [
+        "KP_SOURCE_KEY_INVALID"
+      ],
+      "note": "source_key首部空格"
+    },
+    {
+      "id": "source-key-wrong-prefix",
+      "lineNo": 1011,
+      "expectedIssueCodes": [
+        "KP_SOURCE_KEY_INVALID"
+      ],
+      "note": "来源版本错误"
+    },
+    {
+      "id": "source-key-subject-mismatch",
+      "lineNo": 1012,
+      "expectedIssueCodes": [
+        "KP_SOURCE_KEY_INVALID"
+      ],
+      "note": "source_key科目不匹配"
+    },
+    {
+      "id": "source-key-number-mismatch",
+      "lineNo": 1013,
+      "expectedIssueCodes": [
+        "KP_SOURCE_KEY_INVALID"
+      ],
+      "note": "source_key编号不匹配"
+    },
+    {
+      "id": "subject-zero",
+      "lineNo": 1014,
+      "expectedIssueCodes": [
+        "KP_SUBJECT_NO_INVALID"
+      ],
+      "note": "subject_no下边界外"
+    },
+    {
+      "id": "subject-four",
+      "lineNo": 1015,
+      "expectedIssueCodes": [
+        "KP_SUBJECT_NO_INVALID"
+      ],
+      "note": "subject_no上边界外"
+    },
+    {
+      "id": "subject-string",
+      "lineNo": 1016,
+      "expectedIssueCodes": [
+        "KP_FIELD_TYPE_INVALID"
+      ],
+      "note": "subject_no错误类型"
+    },
+    {
+      "id": "subject-mapping-unknown",
+      "lineNo": 1017,
+      "expectedIssueCodes": [
+        "KP_SUBJECT_MAPPING_UNKNOWN"
+      ],
+      "note": "仅提交科目1映射时科目2无显式映射"
+    },
+    {
+      "id": "number-empty",
+      "lineNo": 1018,
+      "expectedIssueCodes": [
+        "KP_SYLLABUS_NUMBER_INVALID"
+      ],
+      "note": "编号空字符串"
+    },
+    {
+      "id": "number-leading-space",
+      "lineNo": 1019,
+      "expectedIssueCodes": [
+        "KP_SYLLABUS_NUMBER_INVALID"
+      ],
+      "note": "编号首部空格"
+    },
+    {
+      "id": "number-leading-zero-segment",
+      "lineNo": 1020,
+      "expectedIssueCodes": [
+        "KP_SYLLABUS_NUMBER_INVALID"
+      ],
+      "note": "编号分段补零"
+    },
+    {
+      "id": "number-zero-segment",
+      "lineNo": 1021,
+      "expectedIssueCodes": [
+        "KP_SYLLABUS_NUMBER_INVALID"
+      ],
+      "note": "编号分段为0"
+    },
+    {
+      "id": "number-subject-mismatch",
+      "lineNo": 1022,
+      "expectedIssueCodes": [
+        "KP_SUBJECT_NUMBER_MISMATCH"
+      ],
+      "note": "编号首段与subject_no不一致"
+    },
+    {
+      "id": "number-too-long",
+      "lineNo": 1023,
+      "expectedIssueCodes": [
+        "KP_FIELD_VALUE_INVALID"
+      ],
+      "note": "编号超过100字符"
+    },
+    {
+      "id": "number-wrong-type",
+      "lineNo": 1024,
+      "expectedIssueCodes": [
+        "KP_FIELD_TYPE_INVALID"
+      ],
+      "note": "编号错误类型"
+    },
+    {
+      "id": "title-empty",
+      "lineNo": 1025,
+      "expectedIssueCodes": [
+        "KP_FIELD_VALUE_INVALID"
+      ],
+      "note": "标题空字符串"
+    },
+    {
+      "id": "title-whitespace",
+      "lineNo": 1026,
+      "expectedIssueCodes": [
+        "KP_FIELD_VALUE_INVALID"
+      ],
+      "note": "标题全空白"
+    },
+    {
+      "id": "title-length-501",
+      "lineNo": 1027,
+      "expectedIssueCodes": [
+        "KP_FIELD_VALUE_INVALID"
+      ],
+      "note": "标题超过500字符"
+    },
+    {
+      "id": "title-wrong-type",
+      "lineNo": 1028,
+      "expectedIssueCodes": [
+        "KP_FIELD_TYPE_INVALID"
+      ],
+      "note": "标题错误类型"
+    },
+    {
+      "id": "parent-wrong-type",
+      "lineNo": 1029,
+      "expectedIssueCodes": [
+        "KP_FIELD_TYPE_INVALID"
+      ],
+      "note": "父编号错误类型"
+    },
+    {
+      "id": "parent-whitespace",
+      "lineNo": 1030,
+      "expectedIssueCodes": [
+        "KP_SYLLABUS_NUMBER_INVALID"
+      ],
+      "note": "父编号首部空格"
+    },
+    {
+      "id": "parent-missing",
+      "lineNo": 1031,
+      "expectedIssueCodes": [
+        "KP_PARENT_NOT_FOUND"
+      ],
+      "note": "父节点不存在"
+    },
+    {
+      "id": "parent-self",
+      "lineNo": 1032,
+      "expectedIssueCodes": [
+        "KP_TREE_CYCLE"
+      ],
+      "note": "父节点自引用"
+    },
+    {
+      "id": "depth-zero",
+      "lineNo": 1033,
+      "expectedIssueCodes": [
+        "KP_FIELD_VALUE_INVALID"
+      ],
+      "note": "tree_depth下边界外"
+    },
+    {
+      "id": "depth-negative",
+      "lineNo": 1034,
+      "expectedIssueCodes": [
+        "KP_FIELD_VALUE_INVALID"
+      ],
+      "note": "tree_depth负数"
+    },
+    {
+      "id": "depth-32768",
+      "lineNo": 1035,
+      "expectedIssueCodes": [
+        "KP_FIELD_VALUE_INVALID"
+      ],
+      "note": "tree_depth超过smallint"
+    },
+    {
+      "id": "depth-string",
+      "lineNo": 1036,
+      "expectedIssueCodes": [
+        "KP_FIELD_TYPE_INVALID"
+      ],
+      "note": "tree_depth错误类型"
+    },
+    {
+      "id": "root-depth-two",
+      "lineNo": 1037,
+      "expectedIssueCodes": [
+        "KP_TREE_DEPTH_INVALID"
+      ],
+      "note": "根节点层级不是1"
+    },
+    {
+      "id": "sort-zero",
+      "lineNo": 1038,
+      "expectedIssueCodes": [
+        "KP_FIELD_VALUE_INVALID"
+      ],
+      "note": "sort_order下边界外"
+    },
+    {
+      "id": "sort-negative",
+      "lineNo": 1039,
+      "expectedIssueCodes": [
+        "KP_FIELD_VALUE_INVALID"
+      ],
+      "note": "sort_order负数"
+    },
+    {
+      "id": "sort-over-int",
+      "lineNo": 1040,
+      "expectedIssueCodes": [
+        "KP_FIELD_VALUE_INVALID"
+      ],
+      "note": "sort_order超过integer"
+    },
+    {
+      "id": "sort-string",
+      "lineNo": 1041,
+      "expectedIssueCodes": [
+        "KP_FIELD_TYPE_INVALID"
+      ],
+      "note": "sort_order错误类型"
+    },
+    {
+      "id": "description-empty",
+      "lineNo": 1042,
+      "expectedIssueCodes": [
+        "KP_FIELD_VALUE_INVALID"
+      ],
+      "note": "V1 description必须为null"
+    },
+    {
+      "id": "description-wrong-type",
+      "lineNo": 1043,
+      "expectedIssueCodes": [
+        "KP_FIELD_TYPE_INVALID"
+      ],
+      "note": "description错误类型"
+    },
+    {
+      "id": "importance-one",
+      "lineNo": 1044,
+      "expectedIssueCodes": [
+        "KP_FIELD_VALUE_INVALID"
+      ],
+      "note": "V1 importance固定为null"
+    },
+    {
+      "id": "importance-four",
+      "lineNo": 1045,
+      "expectedIssueCodes": [
+        "KP_FIELD_VALUE_INVALID"
+      ],
+      "note": "importance非法枚举"
+    },
+    {
+      "id": "diagnostic-true",
+      "lineNo": 1046,
+      "expectedIssueCodes": [
+        "KP_FIELD_VALUE_INVALID"
+      ],
+      "note": "V1 diagnostic_enabled固定false"
+    },
+    {
+      "id": "diagnostic-string",
+      "lineNo": 1047,
+      "expectedIssueCodes": [
+        "KP_FIELD_TYPE_INVALID"
+      ],
+      "note": "诊断开关错误类型"
+    },
+    {
+      "id": "recommendation-true",
+      "lineNo": 1048,
+      "expectedIssueCodes": [
+        "KP_FIELD_VALUE_INVALID"
+      ],
+      "note": "V1 recommendation_enabled固定false"
+    },
+    {
+      "id": "recommendation-number",
+      "lineNo": 1049,
+      "expectedIssueCodes": [
+        "KP_FIELD_TYPE_INVALID"
+      ],
+      "note": "推荐开关错误类型"
+    },
+    {
+      "id": "status-disabled",
+      "lineNo": 1050,
+      "expectedIssueCodes": [
+        "KP_FIELD_VALUE_INVALID"
+      ],
+      "note": "V1 status固定0"
+    },
+    {
+      "id": "status-number",
+      "lineNo": 1051,
+      "expectedIssueCodes": [
+        "KP_FIELD_TYPE_INVALID"
+      ],
+      "note": "status错误类型"
+    },
+    {
+      "id": "status-unknown",
+      "lineNo": 1052,
+      "expectedIssueCodes": [
+        "KP_FIELD_VALUE_INVALID"
+      ],
+      "note": "status非法值"
+    },
+    {
+      "id": "duplicate-source-and-number-first",
+      "lineNo": 1053,
+      "expectedIssueCodes": [
+        "KP_DUPLICATE_SOURCE_KEY",
+        "KP_DUPLICATE_SYLLABUS_NUMBER"
+      ],
+      "note": "重复组合第一条"
+    },
+    {
+      "id": "duplicate-source-and-number-second",
+      "lineNo": 1054,
+      "expectedIssueCodes": [
+        "KP_DUPLICATE_SOURCE_KEY",
+        "KP_DUPLICATE_SYLLABUS_NUMBER"
+      ],
+      "note": "重复组合第二条"
+    },
+    {
+      "id": "parent-after-child",
+      "lineNo": 1055,
+      "expectedIssueCodes": [
+        "KP_PARENT_ORDER_INVALID"
+      ],
+      "note": "父节点晚于子节点"
+    },
+    {
+      "id": "late-parent",
+      "lineNo": 1056,
+      "expectedIssueCodes": [],
+      "note": "供上一条验证顺序"
+    },
+    {
+      "id": "parent-nonstructural-error",
+      "lineNo": 1057,
+      "expectedIssueCodes": [
+        "KP_FIELD_VALUE_INVALID"
+      ],
+      "note": "父记录只有非结构字段错误"
+    },
+    {
+      "id": "child-of-nonstructural-error",
+      "lineNo": 1058,
+      "expectedIssueCodes": [],
+      "note": "非结构错误父节点仍可用于结构判断"
+    },
+    {
+      "id": "cycle-a",
+      "lineNo": 1059,
+      "expectedIssueCodes": [
+        "KP_TREE_CYCLE"
+      ],
+      "note": "循环A"
+    },
+    {
+      "id": "cycle-b",
+      "lineNo": 1060,
+      "expectedIssueCodes": [
+        "KP_TREE_CYCLE"
+      ],
+      "note": "循环B"
+    },
+    {
+      "id": "invalid-json-syntax",
+      "lineNo": 1061,
+      "expectedIssueCodes": [
+        "KP_JSON_INVALID"
+      ],
+      "note": "JSON语法错误"
+    },
+    {
+      "id": "json-array-root",
+      "lineNo": 1062,
+      "expectedIssueCodes": [
+        "KP_JSON_INVALID"
+      ],
+      "note": "根节点为数组"
+    },
+    {
+      "id": "json-string-root",
+      "lineNo": 1063,
+      "expectedIssueCodes": [
+        "KP_JSON_INVALID"
+      ],
+      "note": "根节点为字符串"
+    },
+    {
+      "id": "json-number-root",
+      "lineNo": 1064,
+      "expectedIssueCodes": [
+        "KP_JSON_INVALID"
+      ],
+      "note": "根节点为数字"
+    },
+    {
+      "id": "json-boolean-root",
+      "lineNo": 1065,
+      "expectedIssueCodes": [
+        "KP_JSON_INVALID"
+      ],
+      "note": "根节点为布尔值"
+    },
+    {
+      "id": "json-null-root",
+      "lineNo": 1066,
+      "expectedIssueCodes": [
+        "KP_JSON_INVALID"
+      ],
+      "note": "根节点为null"
+    },
+    {
+      "id": "json-empty-line",
+      "lineNo": 1067,
+      "expectedIssueCodes": [
+        "KP_JSON_INVALID"
+      ],
+      "note": "纯空白/空物理行"
+    },
+    {
+      "id": "duplicate-json-key",
+      "lineNo": 1068,
+      "expectedIssueCodes": [
+        "KP_JSON_DUPLICATE_KEY"
+      ],
+      "note": "同一对象重复字段名"
+    },
+    {
+      "id": "line-over-1mib",
+      "lineNo": 1069,
+      "expectedIssueCodes": [
+        "KP_JSON_LINE_TOO_LARGE"
+      ],
+      "note": "物理行恰好1,048,577字节"
+    }
+  ],
+  "fileLevelCases": [
+    {
+      "file": "knowledge-point-v7-valid.jsonl",
+      "expected": "accepted"
+    },
+    {
+      "file": "knowledge-point-v7-valid-crlf.jsonl",
+      "expected": "accepted"
+    },
+    {
+      "file": "knowledge-point-v7-valid-no-final-newline.jsonl",
+      "expected": "accepted"
+    },
+    {
+      "file": "knowledge-point-v7-valid-with-bom.jsonl",
+      "expectedErrorCode": "IMPORT_FILE_INVALID"
+    },
+    {
+      "file": "knowledge-point-invalid-utf8.jsonl",
+      "expectedErrorCode": "IMPORT_FILE_INVALID"
+    }
+  ]
+}

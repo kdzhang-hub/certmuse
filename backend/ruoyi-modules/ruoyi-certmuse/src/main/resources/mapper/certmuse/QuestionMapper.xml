@@ -93,8 +93,8 @@
         select cast(rr.question_id as varchar) question_id, cast(rr.id as varchar) revision_id,
                rr.revision_no, rr.question_code,
                cast(scope.syllabus_version_id as varchar) syllabus_version_id,
-               case when sv.id is null then null else concat(ec.certification_name, ' - ', sv.version_name) end syllabus_version_name,
-               rr.stem stem_summary,
+               case when sv.id is null then null else concat(ec.certification_name,' · ',sv.version_name) end syllabus_version_name,
+               case when length(rr.stem)&gt;200 then substring(rr.stem from 1 for 200)||'…' else rr.stem end stem_summary,
                cast(rr.exam_subject_id as varchar) exam_subject_id, es.subject_name exam_subject_name,
                rr.question_type, rr.difficulty, rr.status,
                (rr.review_opinion is not null and btrim(rr.review_opinion) &lt;&gt; '') has_review_opinion,
@@ -175,7 +175,7 @@
       from cm_question_knowledge qk join cm_knowledge_point kp on kp.id=qk.knowledge_point_id where qk.question_revision_id=#{revisionId} order by qk.sort_order
     </select>
     <select id="selectExamSubjectOptions" resultType="org.dromara.certmuse.question.domain.QuestionRows$IdLabel">select cast(id as varchar) id,subject_name label from cm_exam_subject where certification_id=#{certificationId} order by subject_code</select>
-    <select id="selectSyllabusLabel" resultType="org.dromara.certmuse.question.domain.QuestionRows$IdLabel">select cast(sv.id as varchar) id,concat(ec.certification_name, chr(183), sv.version_name) label from cm_syllabus_version sv join cm_exam_certification ec on ec.id=sv.certification_id where sv.id=#{syllabusVersionId}</select>
+    <select id="selectSyllabusLabel" resultType="org.dromara.certmuse.question.domain.QuestionRows$IdLabel">select cast(sv.id as varchar) id,concat(ec.certification_name,' · ',sv.version_name) label from cm_syllabus_version sv join cm_exam_certification ec on ec.id=sv.certification_id where sv.id=#{syllabusVersionId}</select>
     <select id="selectKnowledgeMetadata" resultType="org.dromara.certmuse.question.domain.QuestionRows$Knowledge">
       select kp.id knowledge_point_id,kp.syllabus_version_id,kp.exam_subject_id,not exists(select 1 from cm_knowledge_point c where c.parent_id=kp.id and c.del_flag='0') leaf
       from cm_knowledge_point kp where kp.del_flag='0' and kp.id in <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>

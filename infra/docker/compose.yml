@@ -1,75 +1,145 @@
-name: certmuse-demo
+name: certmuse
 
 services:
   postgres:
-    image: postgres:16-alpine
+    build:
+      context: ../..
+      dockerfile: infra/docker/postgres.Dockerfile
     environment:
+      TZ: Asia/Shanghai
       POSTGRES_DB: ${POSTGRES_DB:-certmuse}
       POSTGRES_USER: ${POSTGRES_USER:-certmuse}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-certmuse_local}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-certmuse}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-certmuse_local}
+      MINIO_BUCKET: ${MINIO_BUCKET:-certmuse}
+      MINIO_INTERNAL_ENDPOINT: ${MINIO_INTERNAL_ENDPOINT:-minio:9000}
+      LOCAL_PUBLIC_REGISTRATION: ${LOCAL_PUBLIC_REGISTRATION:-true}
     ports:
-      - "${POSTGRES_PORT:-15432}:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./postgres/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-certmuse} -d ${POSTGRES_DB:-certmuse}"]
       interval: 5s
       timeout: 5s
       retries: 20
+    restart: unless-stopped
 
   redis:
-    image: redis:8-alpine
-    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:-certmuse_local}"]
+    image: ${REDIS_IMAGE:-redis:8.0.6-alpine@sha256:5f61955be8ab2ccee9372b84ae4d4da2e2b156f87281e3f218544055e7ee04d4}
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --requirepass
+      - ${REDIS_PASSWORD:-certmuse_local}
+    environment:
+      TZ: Asia/Shanghai
     ports:
-      - "${REDIS_PORT:-16379}:6379"
+      - "${REDIS_PORT:-6379}:6379"
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD-SHELL", "redis-cli -a '$$REDIS_PASSWORD' ping | grep PONG"]
+      test: ["CMD-SHELL", "redis-cli -a '${REDIS_PASSWORD:-certmuse_local}' ping | grep PONG"]
       interval: 5s
       timeout: 5s
       retries: 20
+    restart: unless-stopped
+
+  minio:
+    image: ${MINIO_IMAGE:-minio/minio:RELEASE.2025-09-07T16-13-09Z@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e}
+    command: server --address ":9000" --console-address ":9001" /data
     environment:
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-certmuse_local}
+      TZ: Asia/Shanghai
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-certmuse}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-certmuse_local}
+    ports:
+      - "${MINIO_API_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9000/minio/health/live >/dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  minio-init:
+    image: ${MINIO_MC_IMAGE:-minio/mc:RELEASE.2025-08-13T08-35-41Z@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727}
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-certmuse}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-certmuse_local}
+      MINIO_BUCKET: ${MINIO_BUCKET:-certmuse}
+    entrypoint:
+      - /bin/sh
+      - -ec
+      - |
+        mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD"
+        mc mb --ignore-existing "local/$$MINIO_BUCKET"
+        mc anonymous set none "local/$$MINIO_BUCKET"
+    restart: "no"
 
   backend:
     build:
       context: ../..
       dockerfile: infra/docker/backend.Dockerfile
+      args:
+        CERTMUSE_SOURCE_REVISION: ${CERTMUSE_SOURCE_REVISION:-unverified}
     environment:
-      SPRING_PROFILES_ACTIVE: demo
-      CERTMUSE_DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-certmuse}?ApplicationName=certmuse-demo
+      TZ: Asia/Shanghai
+      SPRING_PROFILES_ACTIVE: prod
+      MESSAGE_ENABLED: "true"
+      MESSAGE_TRANSPORT: sse
+      MESSAGE_PATH: /resource/message
+      CERTMUSE_DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-certmuse}?ApplicationName=certmuse
       CERTMUSE_DB_USERNAME: ${POSTGRES_USER:-certmuse}
       CERTMUSE_DB_PASSWORD: ${POSTGRES_PASSWORD:-certmuse_local}
       CERTMUSE_REDIS_HOST: redis
       CERTMUSE_REDIS_PORT: "6379"
       CERTMUSE_REDIS_DATABASE: "0"
       CERTMUSE_REDIS_PASSWORD: ${REDIS_PASSWORD:-certmuse_local}
-      CERTMUSE_JWT_SECRET_KEY: ${CERTMUSE_JWT_SECRET_KEY:-certmuse-local-jwt-signing-key-change-before-public-use}
-      CERTMUSE_CAPTCHA_ENABLED: "false"
-      CERTMUSE_MESSAGE_ENABLED: "false"
-      JAVA_OPTS: ${JAVA_OPTS:--Xms256m -Xmx768m}
+      CERTMUSE_AI_ENABLED: ${CERTMUSE_AI_ENABLED:-false}
+      CERTMUSE_AI_BASE_URL: ${CERTMUSE_AI_BASE_URL:-}
+      CERTMUSE_AI_API_KEY: ${CERTMUSE_AI_API_KEY:-}
+      CERTMUSE_AI_MODEL: ${CERTMUSE_AI_MODEL:-}
+      CERTMUSE_AI_CHAT_COMPLETIONS_PATH: ${CERTMUSE_AI_CHAT_COMPLETIONS_PATH:-/v1/chat/completions}
+      JAVA_OPTS: ${JAVA_OPTS:--Xms512m -Xmx1024m}
     ports:
       - "${BACKEND_PORT:-18080}:8080"
+    volumes:
+      - backend_logs:/app/certmuse/logs
+      - backend_tmp:/app/certmuse/tmp
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/actuator/health"]
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 8080"]
       interval: 10s
       timeout: 5s
       retries: 30
-      start_period: 40s
+      start_period: 30s
+    restart: unless-stopped
 
   frontend:
     build:
       context: ../..
       dockerfile: infra/docker/frontend.Dockerfile
+      args:
+        CERTMUSE_SOURCE_REVISION: ${CERTMUSE_SOURCE_REVISION:-unverified}
+        VITE_APP_IMPORT_MOCK: ${VITE_APP_IMPORT_MOCK:-false}
+    environment:
+      MINIO_UPSTREAM: ${MINIO_INTERNAL_ENDPOINT:-minio:9000}
     ports:
-      - "${FRONTEND_PORT:-13000}:80"
+      - "${FRONTEND_PORT:-3000}:80"
     depends_on:
       backend:
         condition: service_healthy
@@ -78,7 +148,11 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+    restart: unless-stopped
 
 volumes:
   postgres_data:
   redis_data:
+  minio_data:
+  backend_logs:
+  backend_tmp:

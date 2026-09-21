@@ -1,0 +1,193 @@
+{
+  "startedFromIntegration": "2026-07-31T02:39:36.754Z",
+  "finishedAt": "2026-07-31T10:39:37.4913061+08:00",
+  "passed": true,
+  "assertions": [
+    {
+      "name": "D1 precheck does not mutate cm_knowledge_point",
+      "passed": true,
+      "details": {
+        "before": 0,
+        "after": 0
+      }
+    },
+    {
+      "name": "valid batch counters persisted",
+      "passed": true,
+      "details": {
+        "id": 2083019691110932480,
+        "status": "waiting_confirm",
+        "current_stage": "finalize_counts",
+        "valid_count": 1001,
+        "warning_count": 0,
+        "failed_count": 0,
+        "source_file_size": 342969
+      }
+    },
+    {
+      "name": "valid records persisted exactly",
+      "passed": true,
+      "details": {
+        "batch_id": 2083019691110932480,
+        "total": 1001,
+        "success": 1001,
+        "failed": 0
+      }
+    },
+    {
+      "name": "edge batch API and database counters agree",
+      "passed": true,
+      "details": {
+        "id": 2083019702477496320,
+        "status": "waiting_confirm",
+        "current_stage": "finalize_counts",
+        "valid_count": 979,
+        "warning_count": 0,
+        "failed_count": 90,
+        "source_file_size": 1413824
+      }
+    },
+    {
+      "name": "edge physical lines reconcile with persisted and file-level failures",
+      "passed": true,
+      "details": {
+        "records": 1060,
+        "physicalLines": 1069,
+        "recordFailures": 81,
+        "batchFailures": 90
+      }
+    },
+    {
+      "name": "edge issues persisted and match API pagination",
+      "passed": true,
+      "details": {
+        "import_batch_id": 2083019702477496320,
+        "total": 153,
+        "distinct_codes": 19
+      }
+    },
+    {
+      "name": "idempotency records persisted successfully",
+      "passed": true,
+      "details": [
+        {
+          "resource_id": 2083019691110932480,
+          "status": "succeeded",
+          "response_status": 200
+        },
+        {
+          "resource_id": 2083019702477496320,
+          "status": "succeeded",
+          "response_status": 200
+        },
+        {
+          "resource_id": 2083019715886686208,
+          "status": "succeeded",
+          "response_status": 200
+        }
+      ]
+    },
+    {
+      "name": "MinIO source object exists for batch 2083019691110932480",
+      "passed": true,
+      "details": {
+        "batchId": "2083019691110932480"
+      }
+    },
+    {
+      "name": "MinIO source object exists for batch 2083019702477496320",
+      "passed": true,
+      "details": {
+        "batchId": "2083019702477496320"
+      }
+    },
+    {
+      "name": "MinIO source object exists for batch 2083019715886686208",
+      "passed": true,
+      "details": {
+        "batchId": "2083019715886686208"
+      }
+    }
+  ],
+  "database": {
+    "knowledgePointCount": 0,
+    "batches": [
+      {
+        "id": 2083019691110932480,
+        "status": "waiting_confirm",
+        "current_stage": "finalize_counts",
+        "valid_count": 1001,
+        "warning_count": 0,
+        "failed_count": 0,
+        "source_file_size": 342969
+      },
+      {
+        "id": 2083019702477496320,
+        "status": "waiting_confirm",
+        "current_stage": "finalize_counts",
+        "valid_count": 979,
+        "warning_count": 0,
+        "failed_count": 90,
+        "source_file_size": 1413824
+      },
+      {
+        "id": 2083019715886686208,
+        "status": "waiting_confirm",
+        "current_stage": "finalize_counts",
+        "valid_count": 0,
+        "warning_count": 0,
+        "failed_count": 1,
+        "source_file_size": 325
+      }
+    ],
+    "records": [
+      {
+        "batch_id": 2083019691110932480,
+        "total": 1001,
+        "success": 1001,
+        "failed": 0
+      },
+      {
+        "batch_id": 2083019702477496320,
+        "total": 1060,
+        "success": 979,
+        "failed": 81
+      },
+      {
+        "batch_id": 2083019715886686208,
+        "total": 1,
+        "success": 0,
+        "failed": 1
+      }
+    ],
+    "issues": [
+      {
+        "import_batch_id": 2083019702477496320,
+        "total": 153,
+        "distinct_codes": 19
+      },
+      {
+        "import_batch_id": 2083019715886686208,
+        "total": 2,
+        "distinct_codes": 2
+      }
+    ],
+    "idempotency": [
+      {
+        "resource_id": 2083019691110932480,
+        "status": "succeeded",
+        "response_status": 200
+      },
+      {
+        "resource_id": 2083019702477496320,
+        "status": "succeeded",
+        "response_status": 200
+      },
+      {
+        "resource_id": 2083019715886686208,
+        "status": "succeeded",
+        "response_status": 200
+      }
+    ]
+  }
+}

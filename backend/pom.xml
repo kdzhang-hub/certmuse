@@ -5,11 +5,12 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>org.dromara</groupId>
-    <artifactId>certmuse-backend</artifactId>
+    <artifactId>ruoyi-vue-plus</artifactId>
     <version>${revision}</version>
 
-    <name>CertMuse</name>
-    <description>CertMuse backend source</description>
+    <name>RuoYi-Vue-Plus</name>
+    <url>https://gitee.com/dromara/RuoYi-Vue-Plus</url>
+    <description>Dromara RuoYi-Vue-Plus后台管理系统</description>
 
     <properties>
         <!-- 项目基础配置 -->
@@ -76,6 +77,42 @@
         <!-- 打包默认跳过测试 -->
         <maven.test.skip>true</maven.test.skip>
     </properties>
+
+    <profiles>
+        <profile>
+            <id>local</id>
+            <properties>
+                <!-- 环境标识，需要与配置文件的名称相对应 -->
+                <profiles.active>local</profiles.active>
+                <logging.level>info</logging.level>
+                <monitor.username>ruoyi</monitor.username>
+                <monitor.password>123456</monitor.password>
+            </properties>
+        </profile>
+        <profile>
+            <id>dev</id>
+            <properties>
+                <!-- 环境标识，需要与配置文件的名称相对应 -->
+                <profiles.active>dev</profiles.active>
+                <logging.level>info</logging.level>
+                <monitor.username>ruoyi</monitor.username>
+                <monitor.password>123456</monitor.password>
+            </properties>
+            <activation>
+                <!-- 默认环境 -->
+                <activeByDefault>true</activeByDefault>
+            </activation>
+        </profile>
+        <profile>
+            <id>prod</id>
+            <properties>
+                <profiles.active>prod</profiles.active>
+                <logging.level>warn</logging.level>
+                <monitor.username>ruoyi</monitor.username>
+                <monitor.password>123456</monitor.password>
+            </properties>
+        </profile>
+    </profiles>
 
     <!-- 依赖声明 -->
     <dependencyManagement>

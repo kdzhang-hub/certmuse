@@ -28,6 +28,7 @@ export default {
       wechat: '微信登录',
       maxkey: 'MaxKey登录',
       topiam: 'TopIam登录',
+      gitee: 'Gitee登录',
       github: 'Github登录'
     }
   },

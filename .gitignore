@@ -51,6 +51,12 @@ id_ed25519
 credentials*.json
 service-account*.json
 
+# Source-controlled upstream defaults; never place real secrets in them.
+!web/admin/.env.development
+!web/admin/.env.production
+!web/student/.env.development
+!web/student/.env.production
+
 # Test and tooling caches
 .eslintcache
 .stylelintcache
@@ -62,9 +68,24 @@ __pycache__/
 tmp/
 temp/
 work/e2e-reports/
+work/
+target/
 
 # Project-local public agent tools and private operational profiles
 /tools/ops/local/
 /tools/ops/*.tar.gz
 /tools/ops/*.zip
 *.srvops.enc
+
+# Local development and production profiles. The public release uses its
+# checked-in demo and environment templates instead.
+backend/ruoyi-admin/src/main/resources/application-dev.yml
+backend/ruoyi-admin/src/main/resources/application-prod.yml
+backend/ruoyi-extend/**/src/main/resources/application*.yml
+backend/script/docker/
+infra/docker/compose.dev.yml
+infra/docker/compose.e2e.yml
+web/admin/.env.development
+web/admin/.env.production
+web/student/.env.development
+web/student/.env.production

@@ -19,7 +19,6 @@ import org.dromara.certmuse.assessment.domain.KnowledgePracticeIdempotencyRow;
 import org.dromara.certmuse.assessment.domain.KnowledgePracticeNodeRow;
 import org.dromara.certmuse.assessment.domain.KnowledgePracticeQuestionRow;
 import org.dromara.certmuse.assessment.domain.KnowledgePracticeSessionRow;
-import org.dromara.certmuse.assessment.domain.ReinforcementRoundRow;
 import org.dromara.certmuse.assessment.domain.bo.StartKnowledgePracticeBo;
 import org.dromara.certmuse.assessment.domain.bo.SubmitKnowledgePracticeItemBo;
 import org.dromara.certmuse.assessment.domain.vo.KnowledgePracticeErrorVo;
@@ -31,22 +30,17 @@ import org.dromara.certmuse.assessment.domain.vo.KnowledgePracticeItemVo;
 import org.dromara.certmuse.assessment.domain.vo.SubmitKnowledgePracticeItemVo;
 import org.dromara.certmuse.assessment.domain.vo.CompleteKnowledgePracticeVo;
 import org.dromara.certmuse.assessment.domain.vo.StartKnowledgePracticeVo;
-import org.dromara.certmuse.assessment.domain.vo.ReinforcementSuggestionVo;
-import org.dromara.certmuse.assessment.domain.vo.ReinforcementRoundVo;
-import org.dromara.certmuse.assessment.domain.vo.ReinforcementResultVo;
 import org.dromara.certmuse.assessment.mapper.KnowledgePracticeMapper;
 import org.dromara.certmuse.assessment.service.KnowledgePracticeService;
 import org.dromara.certmuse.assessment.service.ChoiceAnswerSettlementService;
 import org.dromara.certmuse.assessment.support.AssessmentJsonSchema;
 import org.dromara.certmuse.assessment.support.KnowledgePracticeLegacyIdempotencyPayloads;
-import org.dromara.certmuse.assessment.support.ReinforcementRecommendationGenerator;
 import org.dromara.certmuse.shared.schema.VersionedJsonDocumentFactory;
 import org.dromara.certmuse.assessment.support.KnowledgePracticeException;
 import org.dromara.certmuse.question.service.QuestionImageUrlService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -59,22 +53,15 @@ public class KnowledgePracticeServiceImpl implements KnowledgePracticeService {
     private final JsonMapper jsonMapper;
     private final QuestionImageUrlService imageUrlService;
     private final ChoiceAnswerSettlementService answerSettlementService;
-    private final ReinforcementRecommendationGenerator reinforcementRecommendationGenerator;
-    private final TransactionTemplate transactionTemplate;
 
     public KnowledgePracticeServiceImpl(KnowledgePracticeMapper mapper, JsonMapper jsonMapper,
                                         QuestionImageUrlService imageUrlService,
-                                        ChoiceAnswerSettlementService answerSettlementService,
-                                        ReinforcementRecommendationGenerator reinforcementRecommendationGenerator,
-                                        TransactionTemplate transactionTemplate) {
+                                        ChoiceAnswerSettlementService answerSettlementService) {
         this.mapper = mapper;
         this.jsonMapper = jsonMapper;
         this.imageUrlService = imageUrlService;
         this.answerSettlementService = answerSettlementService;
-        this.reinforcementRecommendationGenerator = reinforcementRecommendationGenerator;
-        this.transactionTemplate = transactionTemplate;
     }
-
 
     @Override
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
@@ -275,8 +262,6 @@ public class KnowledgePracticeServiceImpl implements KnowledgePracticeService {
                 Map.of("answer_type", "option_keys", "selection_mode", "single", "value", List.of(selected)));
             mapper.insertAttemptAnswer(IdUtil.getSnowflakeNextId(), attemptId, answerData, correct);
             answerSettlementService.settle(item, attemptId, correct, normalized);
-            long reinforcementId = IdUtil.getSnowflakeNextId();
-            mapper.insertInitialReinforcement(reinforcementId, userId, sessionId, questionOrder, correct);
             int submittedCount = mapper.countSubmittedItems(sessionId);
             KnowledgePracticeItemVo.SubmissionVo feedback = new KnowledgePracticeItemVo.SubmissionVo(
                 List.of(selected), correct, correctLabels, grading.path("analysis").asText(null));
@@ -330,170 +315,7 @@ public class KnowledgePracticeServiceImpl implements KnowledgePracticeService {
             submittedCount, returnPath());
         mapper.succeedActionIdempotency(idempotencyId, "cm_learning_session", sessionId,
             actionResponse(result));
-        mapper.completeReinforcementRound(sessionId, userId);
         return result;
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public ReinforcementSuggestionVo reinforcement(long userId, long sessionId, int questionOrder) {
-        ReinforcementRoundRow round = mapper.selectReinforcementBySource(userId, sessionId, questionOrder);
-        if (round == null) throw failure(409, "REINFORCEMENT_SOURCE_NOT_SUBMITTED", "来源题尚未提交", false);
-        return suggestion(round);
-    }
-
-    @Override
-    @Transactional(rollbackFor = Exception.class)
-    public void dismissReinforcement(long userId, long sessionId, int questionOrder) {
-        ReinforcementRoundRow round = mapper.selectReinforcementBySource(userId, sessionId, questionOrder);
-        if (round == null) throw failure(409, "REINFORCEMENT_SOURCE_NOT_SUBMITTED", "来源题尚未提交", false);
-        if (mapper.dismissReinforcement(round.getId(), userId) == 0 && !"DISMISSED".equals(round.getStatus())) {
-            throw failure(409, "REINFORCEMENT_STATE_CONFLICT", "当前建议不可收起", false);
-        }
-    }
-
-    @Override
-    public ReinforcementRoundVo createReinforcement(long userId, long sessionId, int questionOrder, String requestId) {
-        ReinforcementRoundRow round = mapper.selectReinforcementBySource(userId, sessionId, questionOrder);
-        if (round == null) throw failure(409, "REINFORCEMENT_SOURCE_NOT_SUBMITTED", "来源题尚未提交", false);
-        if ("STARTED".equals(round.getStatus()) || "COMPLETED".equals(round.getStatus())) return roundVo(round);
-        if (!"READY".equals(round.getStatus())) {
-            throw failure(409, "REINFORCEMENT_NOT_READY", "强化练习当前不可创建", false);
-        }
-        String normalized = normalizeRequestId(requestId);
-        ReinforcementRecommendationGenerator.Recommendation recommendation =
-            reinforcementRecommendationGenerator.generate(round);
-        return Objects.requireNonNull(transactionTemplate.execute(status ->
-            createRound(userId, round.getId(), normalized, recommendation)));
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public ReinforcementRoundVo reinforcementRound(long userId, long roundId) {
-        ReinforcementRoundRow round = mapper.selectReinforcementRound(roundId, userId);
-        if (round == null) throw failure(404, "REINFORCEMENT_ROUND_NOT_FOUND", "强化轮次不存在", false);
-        return roundVo(round);
-    }
-
-    @Override
-    @Transactional(rollbackFor = Exception.class)
-    public ReinforcementRoundVo continueReinforcement(long userId, long roundId, String requestId) {
-        ReinforcementRoundRow previous = mapper.lockReinforcementRound(roundId, userId);
-        if (previous == null) throw failure(404, "REINFORCEMENT_ROUND_NOT_FOUND", "强化轮次不存在", false);
-        if (!"COMPLETED".equals(previous.getStatus())) {
-            throw failure(409, "REINFORCEMENT_ROUND_NOT_COMPLETED", "上一轮尚未完成", false);
-        }
-        String normalized = normalizeRequestId(requestId);
-        long nextId = IdUtil.getSnowflakeNextId();
-        int inserted = mapper.insertNextReinforcement(nextId, previous, normalized);
-        ReinforcementRoundRow next = mapper.selectReinforcementBySource(userId, previous.getSourceSessionId(),
-            previous.getSourceQuestionOrder());
-        if (inserted == 0 && (next == null || Objects.equals(next.getId(), previous.getId()))) {
-            throw failure(409, "REINFORCEMENT_IDEMPOTENCY_CONFLICT", "请求号已被其他强化操作使用", false);
-        }
-        return createRound(userId, next.getId(), normalized, null);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public ReinforcementResultVo reinforcementResult(long userId, long roundId) {
-        ReinforcementRoundRow round = mapper.selectReinforcementRound(roundId, userId);
-        if (round == null) throw failure(404, "REINFORCEMENT_ROUND_NOT_FOUND", "强化轮次不存在", false);
-        if (!"COMPLETED".equals(round.getStatus())) throw failure(409, "REINFORCEMENT_ROUND_NOT_COMPLETED", "强化轮次尚未完成", false);
-        List<org.dromara.certmuse.assessment.domain.KnowledgePracticeNavigationRow> rows = mapper.selectReinforcementResults(roundId);
-        int correct = (int) rows.stream().filter(row -> Boolean.TRUE.equals(row.getCorrect())).count();
-        boolean more = !mapper.selectReinforcementCandidates(round, round.getSyllabusVersionId()).isEmpty();
-        return new ReinforcementResultVo(String.valueOf(roundId), round.getRoundNo(), correct, rows.size(),
-            rows.isEmpty() ? 0 : correct * 100 / rows.size(), rows.stream().map(row ->
-                new ReinforcementResultVo.ItemVo(row.getQuestionOrder(), Boolean.TRUE.equals(row.getCorrect()))).toList(),
-            knowledgePoints(round), more, more ? "CONTINUE_REINFORCEMENT" : "NO_MORE_QUESTIONS",
-            "/learning/session/practice?sessionId=" + round.getSourceSessionId()
-                + "&questionOrder=" + round.getSourceQuestionOrder());
-    }
-
-    private ReinforcementRoundVo createRound(long userId, long roundId, String requestId,
-                                             ReinforcementRecommendationGenerator.Recommendation recommendation) {
-        ReinforcementRoundRow round = mapper.lockReinforcementRound(roundId, userId);
-        if (round == null) throw failure(404, "REINFORCEMENT_ROUND_NOT_FOUND", "强化轮次不存在", false);
-        if ("STARTED".equals(round.getStatus()) || "COMPLETED".equals(round.getStatus())) return roundVo(round);
-        if (!"READY".equals(round.getStatus())) {
-            String code = "UNAVAILABLE".equals(round.getStatus()) ? "REINFORCEMENT_NO_AVAILABLE_QUESTION" : "REINFORCEMENT_NOT_READY";
-            throw failure(409, code, "强化练习当前不可创建", "PREPARING".equals(round.getStatus()));
-        }
-        KnowledgePracticeGoalRow goal = requireGoal(userId);
-        if (!Objects.equals(goal.getId(), round.getGoalId()) || !Objects.equals(goal.getSyllabusVersionId(), round.getSyllabusVersionId())) {
-            throw failure(409, "REINFORCEMENT_LEARNING_GOAL_CHANGED", "当前学习目标已变化", false);
-        }
-        ReinforcementRecommendationGenerator.Recommendation effectiveRecommendation = recommendation == null
-            ? new ReinforcementRecommendationGenerator.Recommendation(round.getRecommendationReason(),
-                round.getRecommendationSource(), round.getErrorCode())
-            : recommendation;
-        List<KnowledgePracticeQuestionRow> candidates = mapper.selectReinforcementCandidates(round, round.getSyllabusVersionId());
-        if (candidates.isEmpty()) {
-            mapper.updateReinforcementRecommendation(roundId, "UNAVAILABLE", effectiveRecommendation.reason(),
-                effectiveRecommendation.source(), 0, "REINFORCEMENT_NO_AVAILABLE_QUESTION");
-            throw failure(422, "REINFORCEMENT_NO_AVAILABLE_QUESTION", "题库中暂无更多未做题", false);
-        }
-        if (mapper.updateReinforcementRecommendation(roundId, "READY", effectiveRecommendation.reason(),
-            effectiveRecommendation.source(), candidates.size(), effectiveRecommendation.errorCode()) == 0) {
-            throw failure(409, "REINFORCEMENT_STATE_CONFLICT", "强化建议状态已变化", true);
-        }
-        Long ruleVersionId = mapper.selectPublishedRuleVersion();
-        if (ruleVersionId == null) throw failure(503, "REINFORCEMENT_SYSTEM_UNAVAILABLE", "强化练习暂不可用", true);
-        long sessionId = IdUtil.getSnowflakeNextId();
-        if (mapper.insertReinforcementSession(sessionId, round, ruleVersionId, requestId) != 1) {
-            throw failure(409, "REINFORCEMENT_LEARNING_GOAL_CHANGED", "当前学习目标已变化", false);
-        }
-        int order = 1;
-        for (KnowledgePracticeQuestionRow candidate : candidates) {
-            Snapshots frozen = snapshots(candidate);
-            mapper.insertSessionQuestion(IdUtil.getSnowflakeNextId(), sessionId, candidate, order++,
-                frozen.presentation(), frozen.grading(), frozen.knowledge());
-        }
-        if (mapper.startReinforcementRound(roundId, userId, sessionId, requestId, candidates.size()) != 1) {
-            throw failure(409, "REINFORCEMENT_IDEMPOTENCY_CONFLICT", "强化轮次已被其他请求创建", false);
-        }
-        return new ReinforcementRoundVo(String.valueOf(roundId), round.getRoundNo(), "STARTED", candidates.size(),
-            String.valueOf(sessionId), answerPath(sessionId, roundId), String.valueOf(round.getSourceSessionId()),
-            round.getSourceQuestionOrder());
-    }
-
-    private ReinforcementSuggestionVo suggestion(ReinforcementRoundRow round) {
-        List<String> actions = switch (round.getStatus()) {
-            case "READY" -> List.of("START", "DISMISS");
-            case "STARTED" -> List.of("ENTER");
-            case "COMPLETED" -> List.of("VIEW_RESULT");
-            default -> List.of();
-        };
-        return new ReinforcementSuggestionVo(String.valueOf(round.getId()), round.getStatus(), knowledgePoints(round),
-            round.getRecommendationReason(), round.getRecommendationSource(), round.getEstimatedCount(),
-            round.getReinforcementSessionId() == null ? null : String.valueOf(round.getReinforcementSessionId()),
-            round.getReinforcementSessionId() == null ? null : answerPath(round.getReinforcementSessionId(), round.getId()), actions);
-    }
-
-    private List<ReinforcementSuggestionVo.KnowledgePointVo> knowledgePoints(ReinforcementRoundRow round) {
-        try {
-            List<ReinforcementSuggestionVo.KnowledgePointVo> result = new ArrayList<>();
-            for (JsonNode item : jsonMapper.readTree(round.getKnowledgeSnapshot()).path("items")) {
-                result.add(new ReinforcementSuggestionVo.KnowledgePointVo(item.path("knowledgePointId").asText(),
-                    item.path("knowledgePointName").asText()));
-            }
-            return List.copyOf(result);
-        } catch (Exception exception) {
-            throw new KnowledgePracticeException(500, "REINFORCEMENT_SYSTEM_UNAVAILABLE", "强化数据读取失败", true,
-                List.of(), null, exception);
-        }
-    }
-
-    private ReinforcementRoundVo roundVo(ReinforcementRoundRow round) {
-        return new ReinforcementRoundVo(String.valueOf(round.getId()), round.getRoundNo(), round.getStatus(),
-            round.getEstimatedCount(), round.getReinforcementSessionId() == null ? null : String.valueOf(round.getReinforcementSessionId()),
-            round.getReinforcementSessionId() == null ? null : answerPath(round.getReinforcementSessionId(), round.getId()),
-            String.valueOf(round.getSourceSessionId()), round.getSourceQuestionOrder());
-    }
-
-    private String answerPath(long sessionId, long roundId) {
-        return "/learning/session/practice?sessionId=" + sessionId + "&reinforcementRoundId=" + roundId;
     }
 
     private String requireSingleAnswer(SubmitKnowledgePracticeItemBo command) {

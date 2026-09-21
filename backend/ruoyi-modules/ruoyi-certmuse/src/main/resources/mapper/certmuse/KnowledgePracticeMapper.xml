@@ -215,13 +215,13 @@
           from cm_learning_session s
           left join cm_session_question sq on sq.session_id=s.id
           left join cm_question_attempt a on a.session_question_id=sq.id and a.user_id=s.user_id and a.status='submitted'
-         where s.id=#{sessionId} and s.user_id=#{userId} and s.session_type in ('self_practice','reinforcement_practice')
+         where s.id=#{sessionId} and s.user_id=#{userId} and s.session_type='self_practice'
          group by s.id
     </select>
     <update id="startAnsweringSession">
         update cm_learning_session set status='in_progress',started_time=coalesce(started_time,now()),
                status_changed_time=now(),update_time=now()
-         where id=#{sessionId} and user_id=#{userId} and session_type in ('self_practice','reinforcement_practice') and status='created'
+         where id=#{sessionId} and user_id=#{userId} and session_type='self_practice' and status='created'
     </update>
     <select id="selectNavigation" resultType="org.dromara.certmuse.assessment.domain.KnowledgePracticeNavigationRow">
         select sq.question_order,a.id is not null submitted,
@@ -242,12 +242,12 @@
           from cm_learning_session s join cm_session_question sq on sq.session_id=s.id
           left join cm_question_attempt a on a.session_question_id=sq.id and a.user_id=s.user_id and a.status='submitted'
           left join cm_attempt_answer aa on aa.attempt_id=a.id
-         where s.id=#{sessionId} and s.user_id=#{userId} and s.session_type in ('self_practice','reinforcement_practice')
+         where s.id=#{sessionId} and s.user_id=#{userId} and s.session_type='self_practice'
            and sq.question_order=#{questionOrder}
     </select>
     <select id="lockAnsweringSession" resultType="org.dromara.certmuse.assessment.domain.KnowledgePracticeAnsweringSessionRow">
         select id,user_id,goal_id,rule_version_id,status from cm_learning_session
-         where id=#{sessionId} and user_id=#{userId} and session_type in ('self_practice','reinforcement_practice') for update
+         where id=#{sessionId} and user_id=#{userId} and session_type='self_practice' for update
     </select>
     <select id="selectActionIdempotency" resultType="org.dromara.certmuse.assessment.domain.KnowledgePracticeIdempotencyRow">
         select id,payload_hash,status,resource_id,response_body::text from cm_idempotency_record
@@ -421,139 +421,16 @@
     <update id="submitAnsweringSession">
         update cm_learning_session set started_time=coalesce(started_time,now()),status='submitted',
                submitted_time=coalesce(submitted_time,now()),status_changed_time=now(),update_time=now()
-         where id=#{sessionId} and user_id=#{userId} and session_type in ('self_practice','reinforcement_practice')
+         where id=#{sessionId} and user_id=#{userId} and session_type='self_practice'
            and status in('created','in_progress')
     </update>
     <update id="settleAnsweringSession">
         update cm_learning_session set status='settling',status_changed_time=now(),update_time=now()
-         where id=#{sessionId} and user_id=#{userId} and session_type in ('self_practice','reinforcement_practice') and status='submitted'
+         where id=#{sessionId} and user_id=#{userId} and session_type='self_practice' and status='submitted'
     </update>
     <update id="completeAnsweringSession">
         update cm_learning_session set status='completed',settled_time=coalesce(settled_time,now()),
                status_changed_time=now(),update_time=now()
-         where id=#{sessionId} and user_id=#{userId} and session_type in ('self_practice','reinforcement_practice') and status='settling'
+         where id=#{sessionId} and user_id=#{userId} and session_type='self_practice' and status='settling'
     </update>
-
-    <insert id="insertInitialReinforcement">
-        insert into cm_reinforcement_round(id,user_id,source_session_id,source_question_order,source_question_id,
-            source_evidence_group_key,source_difficulty,goal_id,syllabus_version_id,exam_subject_id,round_no,status,
-            knowledge_snapshot,source_presentation_snapshot,source_correct,recommendation_reason,recommendation_source,
-            estimated_count)
-        select #{id},s.user_id,s.id,sq.question_order,sq.question_id,sq.evidence_group_key,
-               coalesce(sq.difficulty_snapshot,'medium'),s.goal_id,s.syllabus_version_id,sq.exam_subject_id,1,'READY',
-               sq.knowledge_snapshot,sq.presentation_snapshot,#{correct},
-               case when #{correct} then '点击开始强化后，将生成学习建议并从题库抽取同知识点题目。'
-                    else '点击开始强化后，将生成学习建议并从题库抽取同知识点题目。' end,
-               'RULE',3
-          from cm_learning_session s join cm_session_question sq on sq.session_id=s.id
-         where s.id=#{sessionId} and s.user_id=#{userId} and s.session_type='self_practice'
-           and sq.question_order=#{questionOrder}
-        on conflict(user_id,source_session_id,source_question_order,round_no) do nothing
-    </insert>
-    <select id="selectReinforcementBySource" resultType="org.dromara.certmuse.assessment.domain.ReinforcementRoundRow">
-        select id,user_id,source_session_id,source_question_order,source_question_id,source_evidence_group_key,
-               source_difficulty,goal_id,syllabus_version_id,exam_subject_id,round_no,previous_round_id,
-               reinforcement_session_id,status,knowledge_snapshot::text,source_presentation_snapshot::text,
-               source_correct,recommendation_reason,recommendation_source,estimated_count,request_id,error_code
-          from cm_reinforcement_round where user_id=#{userId} and source_session_id=#{sessionId}
-           and source_question_order=#{questionOrder} order by round_no desc limit 1
-    </select>
-    <select id="selectReinforcementRound" resultType="org.dromara.certmuse.assessment.domain.ReinforcementRoundRow">
-        select id,user_id,source_session_id,source_question_order,source_question_id,source_evidence_group_key,
-               source_difficulty,goal_id,syllabus_version_id,exam_subject_id,round_no,previous_round_id,
-               reinforcement_session_id,status,knowledge_snapshot::text,source_presentation_snapshot::text,
-               source_correct,recommendation_reason,recommendation_source,estimated_count,request_id,error_code
-          from cm_reinforcement_round where id=#{roundId} and user_id=#{userId}
-    </select>
-    <select id="lockReinforcementRound" resultType="org.dromara.certmuse.assessment.domain.ReinforcementRoundRow">
-        select id,user_id,source_session_id,source_question_order,source_question_id,source_evidence_group_key,
-               source_difficulty,goal_id,syllabus_version_id,exam_subject_id,round_no,previous_round_id,
-               reinforcement_session_id,status,knowledge_snapshot::text,source_presentation_snapshot::text,
-               source_correct,recommendation_reason,recommendation_source,estimated_count,request_id,error_code
-          from cm_reinforcement_round where id=#{roundId} and user_id=#{userId} for update
-    </select>
-    <update id="updateReinforcementRecommendation">
-        update cm_reinforcement_round set status=#{status},recommendation_reason=#{reason},
-               recommendation_source=#{source},estimated_count=#{estimatedCount},error_code=#{errorCode},update_time=now()
-         where id=#{roundId} and status in ('PREPARING','READY')
-    </update>
-    <update id="dismissReinforcement">
-        update cm_reinforcement_round set status='DISMISSED',update_time=now()
-         where id=#{roundId} and user_id=#{userId} and status='READY'
-    </update>
-
-    <select id="selectReinforcementCandidates" resultType="org.dromara.certmuse.assessment.domain.KnowledgePracticeQuestionRow">
-        with targets as (
-            select (x-&gt;&gt;'knowledgePointId')::bigint id from jsonb_array_elements(#{round.knowledgeSnapshot}::jsonb-&gt;'items') x
-             where coalesce(x-&gt;&gt;'relationRole','tested')='tested'
-        ), latest as (
-            select distinct on (r.question_id) r.* from cm_question_revision r
-             where r.status='published' order by r.question_id,r.revision_no desc,r.id desc
-        ), ranked as (
-            select q.id question_id,r.id revision_id,r.question_type,coalesce(r.difficulty,'medium') difficulty,
-                   r.estimated_seconds,r.stem,r.analysis,r.answer::text answer_json,q.evidence_group_key,
-                   count(distinct qk.knowledge_point_id)::int knowledge_overlap
-              from cm_question q join latest r on r.question_id=q.id
-              join cm_question_knowledge qk on qk.question_id=q.id and qk.question_revision_id=r.id
-              join targets t on t.id=qk.knowledge_point_id
-             where q.del_flag='0' and q.id&lt;&gt;#{round.sourceQuestionId}
-               and coalesce(nullif(btrim(q.evidence_group_key),''),concat('Q:',q.id))&lt;&gt;#{round.sourceEvidenceGroupKey}
-               and qk.exam_subject_id=#{round.examSubjectId}
-               and <include refid="snapshotEligibility"/>
-               and not exists (
-                   select 1 from cm_question_attempt a join cm_session_question done_sq on done_sq.id=a.session_question_id
-                   join cm_learning_session done_s on done_s.id=done_sq.session_id
-                    where a.user_id=#{round.userId} and a.status='submitted' and done_s.goal_id=#{round.goalId}
-                      and done_s.syllabus_version_id=#{round.syllabusVersionId} and done_sq.question_id=q.id)
-               and not exists (
-                   select 1 from cm_reinforcement_round rr join cm_session_question used on used.session_id=rr.reinforcement_session_id
-                    where rr.user_id=#{round.userId} and rr.source_session_id=#{round.sourceSessionId}
-                      and rr.source_question_order=#{round.sourceQuestionOrder} and used.question_id=q.id)
-             group by q.id,r.id,r.question_type,r.difficulty,r.estimated_seconds,r.stem,r.analysis,r.answer,q.evidence_group_key
-        )
-        select ranked.question_id,ranked.revision_id,#{round.examSubjectId} exam_subject_id,
-               coalesce(nullif(btrim(ranked.evidence_group_key),''),concat('Q:',ranked.question_id)) evidence_group_key,
-               ranked.question_type,ranked.difficulty,ranked.estimated_seconds,ranked.stem,ranked.analysis,ranked.answer_json,
-               coalesce((select jsonb_agg(jsonb_build_object('label',o.option_label,'content',o.option_text,'sortOrder',o.sort_order) order by o.sort_order,o.id) from cm_question_option o where o.question_revision_id=ranked.revision_id),'[]')::text options_json,
-               coalesce((select jsonb_agg(jsonb_build_object('sourceUrl',im.source_url,'storagePath',im.storage_path,'altText',im.alt_text,'sortOrder',im.image_order) order by im.image_order,im.id) from cm_question_image im where im.question_revision_id=ranked.revision_id),'[]')::text images_json,
-               coalesce((select jsonb_agg(jsonb_build_object('knowledgePointId',kp.id::text,'knowledgePointName',kp.syllabus_title,'examSubjectId',kp.exam_subject_id::text,'relationRole','tested','sortOrder',kp.sort_order) order by kp.id) from cm_question_knowledge all_qk join cm_knowledge_point kp on kp.id=all_qk.knowledge_point_id where all_qk.question_revision_id=ranked.revision_id and kp.syllabus_version_id=#{round.syllabusVersionId} and kp.del_flag='0' and kp.status='0'),'[]')::text knowledge_json,
-               '{}'::text grading_rules_json,1.00 max_score,ranked.knowledge_overlap,
-               abs((case ranked.difficulty when 'easy' then 1 when 'medium' then 2 when 'hard' then 3 else 2 end)-
-                   (case #{round.sourceDifficulty} when 'easy' then 1 when 'medium' then 2 when 'hard' then 3 else 2 end)) difficulty_distance
-          from ranked order by knowledge_overlap desc,difficulty_distance,question_id limit 3
-    </select>
-    <insert id="insertReinforcementSession">
-        insert into cm_learning_session(id,user_id,goal_id,exam_subject_id,session_type,status,rule_version_id,request_id,
-            certification_id,syllabus_version_id,target_exam_year,target_exam_month,row_version)
-        select #{id},#{round.userId},g.id,#{round.examSubjectId},'reinforcement_practice','created',#{ruleVersionId},#{requestId},
-               g.certification_id,g.syllabus_version_id,g.target_exam_year,g.target_exam_month,0
-          from cm_user_goal g where g.id=#{round.goalId} and g.user_id=#{round.userId} and g.status='active'
-           and g.syllabus_version_id=#{round.syllabusVersionId}
-    </insert>
-    <update id="startReinforcementRound">
-        update cm_reinforcement_round set status='STARTED',reinforcement_session_id=#{sessionId},
-               request_id=#{requestId},estimated_count=#{count},update_time=now()
-         where id=#{roundId} and user_id=#{userId} and status='READY'
-    </update>
-    <update id="completeReinforcementRound">
-        update cm_reinforcement_round set status='COMPLETED',completed_time=now(),update_time=now()
-         where reinforcement_session_id=#{sessionId} and user_id=#{userId} and status='STARTED'
-    </update>
-    <insert id="insertNextReinforcement">
-        insert into cm_reinforcement_round(id,user_id,source_session_id,source_question_order,source_question_id,
-            source_evidence_group_key,source_difficulty,goal_id,syllabus_version_id,exam_subject_id,round_no,
-            previous_round_id,status,knowledge_snapshot,source_presentation_snapshot,source_correct,
-            recommendation_reason,recommendation_source,request_id)
-        values(#{id},#{previous.userId},#{previous.sourceSessionId},#{previous.sourceQuestionOrder},#{previous.sourceQuestionId},
-            #{previous.sourceEvidenceGroupKey},#{previous.sourceDifficulty},#{previous.goalId},#{previous.syllabusVersionId},
-            #{previous.examSubjectId},#{previous.roundNo}+1,#{previous.id},'READY',#{previous.knowledgeSnapshot}::jsonb,
-            #{previous.sourcePresentationSnapshot}::jsonb,#{previous.sourceCorrect},#{previous.recommendationReason},
-            #{previous.recommendationSource},#{requestId}) on conflict do nothing
-    </insert>
-    <select id="selectReinforcementResults" resultType="org.dromara.certmuse.assessment.domain.KnowledgePracticeNavigationRow">
-        select sq.question_order,true submitted,coalesce(aa.score_rate=1,false) correct
-          from cm_reinforcement_round rr join cm_session_question sq on sq.session_id=rr.reinforcement_session_id
-          left join cm_question_attempt a on a.session_question_id=sq.id and a.user_id=rr.user_id and a.status='submitted'
-          left join cm_attempt_answer aa on aa.attempt_id=a.id where rr.id=#{roundId} order by sq.question_order
-    </select>
 </mapper>

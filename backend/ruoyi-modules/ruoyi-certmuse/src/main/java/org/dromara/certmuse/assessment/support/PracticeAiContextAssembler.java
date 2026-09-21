@@ -44,8 +44,7 @@ public class PracticeAiContextAssembler {
                 "USER".equals(row.getRole()) ? "user" : "assistant", row.getContent())));
             messages.add(new AiModelRequest.Message("user", userMessage));
             return new PracticeAiContext(new AiModelRequest(properties.getModel(), messages,
-                images(presentation.path("images"))), correct, analysis, knowledgeIds(knowledge.path("items")),
-                presentation.path("stem").asText("") + "\n" + userMessage);
+                images(presentation.path("images"))), correct, analysis);
         } catch (PracticeAiException exception) {
             throw exception;
         } catch (Exception exception) {
@@ -115,17 +114,6 @@ public class PracticeAiContextAssembler {
     private List<String> texts(JsonNode values) {
         List<String> result = new ArrayList<>();
         if (values.isArray()) values.forEach(value -> result.add(value.asText()));
-        return List.copyOf(result);
-    }
-
-    private List<Long> knowledgeIds(JsonNode values) {
-        List<Long> result = new ArrayList<>();
-        if (values.isArray()) {
-            values.forEach(value -> {
-                long id = value.path("knowledgePointId").asLong(0);
-                if (id > 0 && !result.contains(id)) result.add(id);
-            });
-        }
         return List.copyOf(result);
     }
 

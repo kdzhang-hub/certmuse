@@ -96,7 +96,7 @@ public class AuthController {
         Long userId = LoginHelper.getUserId();
         String welcomeMessage = EntryType.LEARNING.name().equals(loginVo.getEntryType())
             ? "欢迎登录 CertMuse 学习平台"
-            : "欢迎登录 CertMuse 运营控制台";
+            : "欢迎登录 RuoYi-Vue-Plus 后台管理系统";
         scheduledExecutorService.schedule(() -> {
             messageService.publishMessage(
                 List.of(userId),

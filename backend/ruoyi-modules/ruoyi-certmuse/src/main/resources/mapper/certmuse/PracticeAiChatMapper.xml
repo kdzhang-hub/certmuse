@@ -10,8 +10,7 @@
           join cm_session_question sq on sq.session_id=s.id
           left join cm_question_attempt a on a.session_question_id=sq.id and a.user_id=s.user_id and a.status='submitted'
           left join cm_attempt_answer aa on aa.attempt_id=a.id
-         where s.id=#{sessionId} and s.user_id=#{userId}
-           and s.session_type in ('self_practice','reinforcement_practice')
+         where s.id=#{sessionId} and s.user_id=#{userId} and s.session_type='self_practice'
            and sq.question_order=#{questionOrder}
     </select>
 
@@ -45,7 +44,7 @@
     <select id="selectMessages" resultType="org.dromara.certmuse.assessment.domain.PracticeAiMessageRow">
         select * from (
             select id,conversation_id,reply_to_message_id,sequence_no,role,content,status,
-                   answer_disclosure_mode,error_code,client_message_id,citations::text as citations,create_time,completed_time
+                   answer_disclosure_mode,error_code,client_message_id,create_time,completed_time
               from cm_ai_message where conversation_id=#{conversationId}
               <if test="beforeSequence != null">and sequence_no &lt; #{beforeSequence}</if>
              order by sequence_no desc limit #{limit}
@@ -54,24 +53,24 @@
     <select id="selectRecentMessages" resultType="org.dromara.certmuse.assessment.domain.PracticeAiMessageRow">
         select * from (
             select id,conversation_id,reply_to_message_id,sequence_no,role,content,status,
-                   answer_disclosure_mode,error_code,client_message_id,citations::text as citations,create_time,completed_time
+                   answer_disclosure_mode,error_code,client_message_id,create_time,completed_time
               from cm_ai_message where conversation_id=#{conversationId} and status='COMPLETED'
              order by sequence_no desc limit #{limit}
         ) recent order by sequence_no
     </select>
     <select id="selectUserMessageByClientId" resultType="org.dromara.certmuse.assessment.domain.PracticeAiMessageRow">
         select id,conversation_id,reply_to_message_id,sequence_no,role,content,status,
-               answer_disclosure_mode,error_code,client_message_id,citations::text as citations,create_time,completed_time
+               answer_disclosure_mode,error_code,client_message_id,create_time,completed_time
           from cm_ai_message where client_message_id=#{clientMessageId} and role='USER'
     </select>
     <select id="selectAssistantReply" resultType="org.dromara.certmuse.assessment.domain.PracticeAiMessageRow">
         select id,conversation_id,reply_to_message_id,sequence_no,role,content,status,
-               answer_disclosure_mode,error_code,client_message_id,citations::text as citations,create_time,completed_time
+               answer_disclosure_mode,error_code,client_message_id,create_time,completed_time
           from cm_ai_message where reply_to_message_id=#{userMessageId} and role='ASSISTANT'
     </select>
     <select id="selectOwnedAssistantMessage" resultType="org.dromara.certmuse.assessment.domain.PracticeAiMessageRow">
         select m.id,m.conversation_id,m.reply_to_message_id,m.sequence_no,m.role,m.content,m.status,
-               m.answer_disclosure_mode,m.error_code,m.client_message_id,m.citations::text as citations,m.create_time,m.completed_time
+               m.answer_disclosure_mode,m.error_code,m.client_message_id,m.create_time,m.completed_time
           from cm_ai_message m join cm_ai_conversation c on c.id=m.conversation_id
          where m.id=#{messageId} and m.conversation_id=#{conversationId} and m.role='ASSISTANT' and c.user_id=#{userId}
     </select>
@@ -86,7 +85,7 @@
         on conflict do nothing
     </insert>
     <update id="completeAssistantMessage">
-        update cm_ai_message set content=#{content},citations=cast(#{citations} as jsonb),status='COMPLETED',error_code=null,completed_time=now()
+        update cm_ai_message set content=#{content},status='COMPLETED',error_code=null,completed_time=now()
          where id=#{id} and status='GENERATING'
     </update>
     <update id="failAssistantMessage">
@@ -99,7 +98,7 @@
     </update>
     <select id="selectStaleGenerating" resultType="org.dromara.certmuse.assessment.domain.PracticeAiMessageRow">
         select m.id,m.conversation_id,m.reply_to_message_id,m.sequence_no,m.role,m.content,m.status,
-               m.answer_disclosure_mode,m.error_code,m.client_message_id,m.citations::text as citations,m.create_time,m.completed_time,
+               m.answer_disclosure_mode,m.error_code,m.client_message_id,m.create_time,m.completed_time,
                c.user_id owner_user_id
           from cm_ai_message m join cm_ai_conversation c on c.id=m.conversation_id
          where m.status='GENERATING' and m.create_time &lt; now()-(#{seconds} * interval '1 second')

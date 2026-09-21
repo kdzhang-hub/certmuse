@@ -52,7 +52,6 @@ import org.dromara.certmuse.catalog.support.ImportJsonSchema;
 import org.dromara.certmuse.catalog.support.ImportProtocol;
 import org.dromara.certmuse.catalog.support.ImportStorage;
 import org.dromara.certmuse.catalog.support.QuestionImportSubjectPreReader;
-import org.dromara.certmuse.catalog.support.PaperImportArchiveAssembler;
 import org.dromara.common.core.domain.PageResult;
 import org.dromara.common.oss.exception.S3StorageException;
 import org.dromara.common.satoken.utils.LoginHelper;
@@ -613,8 +612,7 @@ public class ImportServiceImpl implements ImportService {
         boolean committed = false;
         try {
             temp = Files.createTempFile("certmuse-paper-import-", ".zip");
-            String sourceName = PaperImportArchiveAssembler.assemble(form.sourceFiles(), temp);
-            String hash = hash(temp);
+            String hash = copyAndHash(form.getFile(), temp);
             List<DerivedQuestionSubjectVo> subjects = new QuestionImportSubjectPreReader(objectMapper)
                 .read(temp, repository.selectExamSubjectOptions(syllabusId));
             String config = jsonDocuments.flat(ImportJsonSchema.QUESTION_ZIP_CONFIG, Map.of(
@@ -643,13 +641,13 @@ public class ImportServiceImpl implements ImportService {
                 if ("PAST_PAPER".equals(form.getCollectionType())) {
                     persistence.createPaper(id, requestId, payloadHash, syllabusId, certificationId, form.getCollectionName(),
                         form.getCollectionType(), form.getDurationMinutes(), form.getExamYear(), form.getExamMonth(),
-                        form.getPaperTypeCode(), form.getPaperTypeName(), key, hash, safeName(sourceName),
-                        Files.size(temp), "application/zip", config, LoginHelper.getUserId(), LoginHelper.getDeptId(),
+                        form.getPaperTypeCode(), form.getPaperTypeName(), key, hash, safeName(form.getFile().getOriginalFilename()),
+                        form.getFile().getSize(), form.getFile().getContentType(), config, LoginHelper.getUserId(), LoginHelper.getDeptId(),
                         createTime, batchResponse(ImportJsonSchema.PAPER_PRECHECK_CREATE, id));
                 } else {
                     persistence.createPaper(id, requestId, payloadHash, syllabusId, certificationId, form.getCollectionName(),
-                        form.getCollectionType(), form.getDurationMinutes(), key, hash, safeName(sourceName),
-                        Files.size(temp), "application/zip", config, LoginHelper.getUserId(), LoginHelper.getDeptId(),
+                        form.getCollectionType(), form.getDurationMinutes(), key, hash, safeName(form.getFile().getOriginalFilename()),
+                        form.getFile().getSize(), form.getFile().getContentType(), config, LoginHelper.getUserId(), LoginHelper.getDeptId(),
                         createTime, batchResponse(ImportJsonSchema.PAPER_PRECHECK_CREATE, id));
                 }
                 committed = true;
@@ -1367,14 +1365,6 @@ public class ImportServiceImpl implements ImportService {
         return HexFormat.of().formatHex(digest.digest());
     }
 
-    private static String hash(Path source) throws Exception {
-        MessageDigest digest = MessageDigest.getInstance("SHA-256");
-        try (InputStream input = Files.newInputStream(source); DigestInputStream digestInput = new DigestInputStream(input, digest)) {
-            digestInput.transferTo(OutputStream.nullOutputStream());
-        }
-        return HexFormat.of().formatHex(digest.digest());
-    }
-
     private static void validateUtf8Jsonl(Path temp) throws Exception {
         CharsetDecoder decoder = StandardCharsets.UTF_8.newDecoder()
             .onMalformedInput(CodingErrorAction.REPORT)
@@ -1409,22 +1399,11 @@ public class ImportServiceImpl implements ImportService {
 
     private static void validatePaperHeader(String requestId, PaperImportCreateBo form) {
         validateRequestId(requestId);
-        if (form != null && form.getFile() != null && form.getFiles() != null && !form.getFiles().isEmpty()) {
-            throw context("files", "INVALID_FORMAT", "file 与 files 不能同时提交");
-        }
-        if (form == null || form.sourceFiles().isEmpty() || form.sourceFiles().size() > 3) {
+        if (form == null || form.getFile() == null || form.getFile().isEmpty()
+            || form.getFile().getSize() > MAX_QUESTION_FILE_SIZE
+            || form.getFile().getOriginalFilename() == null
+            || !form.getFile().getOriginalFilename().toLowerCase(Locale.ROOT).endsWith(".zip")) {
             throw fileError("文件为空、扩展名错误或超过64MiB");
-        }
-        long totalSize = 0;
-        for (MultipartFile file : form.sourceFiles()) {
-            String filename = file == null ? null : file.getOriginalFilename();
-            if (file == null || file.isEmpty() || filename == null || !filename.toLowerCase(Locale.ROOT).endsWith(".zip")) {
-                throw fileError("文件为空、扩展名错误或超过64MiB");
-            }
-            totalSize += file.getSize();
-            if (totalSize > MAX_QUESTION_FILE_SIZE) {
-                throw fileError("文件为空、扩展名错误或超过64MiB");
-            }
         }
         String type = normalize(form.getCollectionType());
         if (!Set.of("FIRST_DIAGNOSTIC", "PRACTICE", "SIMULATION", "PAST_PAPER").contains(type)) {

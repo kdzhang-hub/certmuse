@@ -1,0 +1,3615 @@
+{
+  "startedAt": "2026-07-31T02:39:29.442Z",
+  "baseUrl": "http://localhost:18080",
+  "assertions": [
+    {
+      "name": "options rejects unauthenticated request",
+      "passed": true,
+      "details": {
+        "status": 200,
+        "body": {
+          "code": 401,
+          "data": null,
+          "msg": "登录状态异常，请重新登录"
+        },
+        "headers": {
+          "content-length": "69",
+          "content-type": "application/json",
+          "date": "Fri, 31 Jul 2026 02:39:29 GMT",
+          "vary": "Origin, Access-Control-Request-Method, Access-Control-Request-Headers"
+        }
+      }
+    },
+    {
+      "name": "admin login succeeds",
+      "passed": true,
+      "details": {
+        "status": 200,
+        "code": 200,
+        "hasAccessToken": true
+      }
+    },
+    {
+      "name": "options returns import context",
+      "passed": true,
+      "details": {
+        "status": 200,
+        "body": {
+          "code": 200,
+          "data": {
+            "syllabusVersions": [
+              {
+                "id": "900000000000000021",
+                "label": "系统架构设计师 · 第二版",
+                "knowledgeTreeAvailable": false,
+                "knowledgePointCount": 0
+              }
+            ],
+            "examSubjects": []
+          },
+          "msg": "操作成功"
+        },
+        "headers": {
+          "content-length": "209",
+          "content-type": "application/json;charset=utf-8",
+          "date": "Fri, 31 Jul 2026 02:39:29 GMT",
+          "vary": "Origin, Access-Control-Request-Method, Access-Control-Request-Headers"
+        }
+      }
+    },
+    {
+      "name": "three subject mappings are available",
+      "passed": true,
+      "details": [
+        {
+          "id": "900000000000000012",
+          "subjectNo": 1,
+          "label": "案例分析"
+        },
+        {
+          "id": "900000000000000011",
+          "subjectNo": 2,
+          "label": "综合知识"
+        },
+        {
+          "id": "900000000000000013",
+          "subjectNo": 3,
+          "label": "论文"
+        }
+      ]
+    },
+    {
+      "name": "valid baseline upload creates batch",
+      "passed": true,
+      "details": {
+        "status": 200,
+        "body": {
+          "code": 200,
+          "data": {
+            "id": "2083019691110932480",
+            "importType": "knowledge_point",
+            "syllabusVersionId": "900000000000000021",
+            "templateVersion": "knowledge_point/1.0",
+            "status": "uploaded",
+            "reused": false,
+            "createTime": "2026-07-31T10:39:29.676308157+08:00"
+          },
+          "msg": "操作成功"
+        },
+        "headers": {
+          "content-length": "267",
+          "content-type": "application/json;charset=utf-8",
+          "date": "Fri, 31 Jul 2026 02:39:29 GMT",
+          "vary": "Origin, Access-Control-Request-Method, Access-Control-Request-Headers"
+        }
+      }
+    },
+    {
+      "name": "identical request id reuses batch",
+      "passed": true,
+      "details": {
+        "status": 200,
+        "body": {
+          "code": 200,
+          "data": {
+            "id": "2083019691110932480",
+            "importType": "knowledge_point",
+            "syllabusVersionId": "900000000000000021",
+            "templateVersion": "knowledge_point/1.0",
+            "status": "uploaded",
+            "reused": true,
+            "createTime": "2026-07-31T10:39:29.676308+08:00"
+          },
+          "msg": "操作成功"
+        },
+        "headers": {
+          "content-length": "263",
+          "content-type": "application/json;charset=utf-8",
+          "date": "Fri, 31 Jul 2026 02:39:29 GMT",
+          "vary": "Origin, Access-Control-Request-Method, Access-Control-Request-Headers"
+        }
+      }
+    },
+    {
+      "name": "changed payload with same request id conflicts",
+      "passed": true,
+      "details": {
+        "status": 409,
+        "body": {
+          "code": 409,
+          "data": {
+            "errorCode": "IMPORT_REQUEST_ID_CONFLICT",
+            "retryable": false,
+            "traceId": null,
+            "fieldErrors": []
+          },
+          "msg": "请求号已被使用"
+        },
+        "headers": {
+          "content-type": "application/json",
+          "date": "Fri, 31 Jul 2026 02:39:29 GMT",
+          "transfer-encoding": "chunked",
+          "vary": "Origin, Access-Control-Request-Method, Access-Control-Request-Headers"
+        }
+      }
+    },
+    {
+      "name": "batch 2083019691110932480 validate accepted",
+      "passed": true,
+      "details": {
+        "status": 200,
+        "body": {
+          "code": 200,
+          "data": {
+            "id": "2083019691110932480",
+            "status": "parsing",
+            "currentStage": "read_jsonl",
+            "accepted": true
+          },
+          "msg": "预检任务已受理"
+        },
+        "headers": {
+          "content-length": "141",
+          "content-type": "application/json;charset=utf-8",
+          "date": "Fri, 31 Jul 2026 02:39:29 GMT",
+          "vary": "Origin, Access-Control-Request-Method, Access-Control-Request-Headers"
+        }
+      }
+    },
+    {
+      "name": "batch 2083019691110932480 reached terminal precheck state",
+      "passed": true,
+      "details": {
+        "status": 200,
+        "body": {
+          "code": 200,
+          "data": {
+            "id": "2083019691110932480",
+            "status": "waiting_confirm",
+            "currentStage": "finalize_counts",
+            "progressPercent": "100.00",
+            "totalCount": 1001,
+            "validCount": 1001,
+            "warningCount": 0,
+            "failedCount": 0,
+            "startedTime": "2026-07-31T10:39:29.738232+08:00",
+            "finishedTime": "2026-07-31T10:39:31.944531+08:00",
+            "failureTraceId": null
+          },
+          "msg": "操作成功"
+        },
+        "headers": {
+          "content-length": "346",
+          "content-type": "application/json;charset=utf-8",
+          "date": "Fri, 31 Jul 2026 02:39:32 GMT",
+          "vary": "Origin, Access-Control-Request-Method, Access-Control-Request-Headers"
+        }
+      }
+    },
+    {
+      "name": "valid baseline waits for confirmation",
+      "passed": true,
+      "details": {
+        "id": "2083019691110932480",
+        "status": "waiting_confirm",
+        "currentStage": "finalize_counts",
+        "progressPercent": "100.00",
+        "totalCount": 1001,
+        "validCount": 1001,
+        "warningCount": 0,
+        "failedCount": 0,
+        "startedTime": "2026-07-31T10:39:29.738232+08:00",
+        "finishedTime": "2026-07-31T10:39:31.944531+08:00",
+        "failureTraceId": null
+      }
+    },
+    {
+      "name": "valid baseline counts are exact",
+      "passed": true,
+      "details": {
+        "id": "2083019691110932480",
+        "status": "waiting_confirm",
+        "currentStage": "finalize_counts",
+        "progressPercent": "100.00",
+        "totalCount": 1001,
+        "validCount": 1001,
+        "warningCount": 0,
+        "failedCount": 0,
+        "startedTime": "2026-07-31T10:39:29.738232+08:00",
+        "finishedTime": "2026-07-31T10:39:31.944531+08:00",
+        "failureTraceId": null
+      }
+    },
+    {
+      "name": "batch 2083019691110932480 issues page 1",
+      "passed": true,
+      "details": {
+        "status": 200,
+        "body": {
+          "code": 200,
+          "data": {
+            "total": 0,
+            "rows": []
+          },
+          "msg": "操作成功"
+        },
+        "headers": {
+          "content-length": "62",
+          "content-type": "application/json;charset=utf-8",
+          "date": "Fri, 31 Jul 2026 02:39:32 GMT",
+          "vary": "Origin, Access-Control-Request-Method, Access-Control-Request-Headers"
+        }
+      }
+    },
+    {
+      "name": "valid baseline has no issues",
+      "passed": true
+    },
+    {
+      "name": "combined edge fixture uploads",
+      "passed": true,
+      "details": {
+        "status": 200,
+        "body": {
+          "code": 200,
+          "data": {
+            "id": "2083019702477496320",
+            "importType": "knowledge_point",
+            "syllabusVersionId": "900000000000000021",
+            "templateVersion": "knowledge_point/1.0",
+            "status": "uploaded",
+            "reused": false,
+            "createTime": "2026-07-31T10:39:32.38761322+08:00"
+          },
+          "msg": "操作成功"
+        },
+        "headers": {
+          "content-length": "266",
+          "content-type": "application/json;charset=utf-8",
+          "date": "Fri, 31 Jul 2026 02:39:32 GMT",
+          "vary": "Origin, Access-Control-Request-Method, Access-Control-Request-Headers"
+        }
+      }
+    },
+    {
+      "name": "batch 2083019702477496320 validate accepted",
+      "passed": true,
+      "details": {
+        "status": 200,
+        "body": {
+          "code": 200,
+          "data": {
+            "id": "2083019702477496320",
+            "status": "parsing",
+            "currentStage": "read_jsonl",
+            "accepted": true
+          },
+          "msg": "预检任务已受理"
+        },
+        "headers": {
+          "content-length": "141",
+          "content-type": "application/json;charset=utf-8",
+          "date": "Fri, 31 Jul 2026 02:39:32 GMT",
+          "vary": "Origin, Access-Control-Request-Method, Access-Control-Request-Headers"
+        }
+      }
+    },
+    {
+      "name": "batch 2083019702477496320 reached terminal precheck state",
+      "passed": true,
+      "details": {
+        "status": 200,
+        "body": {
+          "code": 200,
+          "data": {
+            "id": "2083019702477496320",
+            "status": "waiting_confirm",
+            "currentStage": "finalize_counts",
+            "progressPercent": "100.00",
+            "totalCount": 1069,
+            "validCount": 979,
+            "warningCount": 0,
+            "failedCount": 90,
+            "startedTime": "2026-07-31T10:39:32.401697+08:00",
+            "finishedTime": "2026-07-31T10:39:35.30257+08:00",
+            "failureTraceId": null
+          },
+          "msg": "操作成功"
+        },
+        "headers": {
+          "content-length": "345",
+          "content-type": "application/json;charset=utf-8",
+          "date": "Fri, 31 Jul 2026 02:39:35 GMT",
+          "vary": "Origin, Access-Control-Request-Method, Access-Control-Request-Headers"
+        }
+      }
+    },
+    {
+      "name": "batch 2083019702477496320 issues page 1",
+      "passed": true,
+      "details": {
+        "status": 200,
+        "body": {
+          "code": 200,
+          "data": {
+            "total": 153,
+            "rows": [
+              {
+                "lineNo": 1,
+                "sourceKey": "knowledge-tree-v7:1:1.1",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:34.055683+08:00"
+              },
+              {
+                "lineNo": 139,
+                "sourceKey": "knowledge-tree-v7:1:1.2",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:34.257945+08:00"
+              },
+              {
+                "lineNo": 224,
+                "sourceKey": "knowledge-tree-v7:1:1.3",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:34.359338+08:00"
+              },
+              {
+                "lineNo": 305,
+                "sourceKey": "knowledge-tree-v7:1:1.4",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:34.446276+08:00"
+              },
+              {
+                "lineNo": 413,
+                "sourceKey": "knowledge-tree-v7:1:1.5",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:34.563283+08:00"
+              },
+              {
+                "lineNo": 487,
+                "sourceKey": "knowledge-tree-v7:1:1.6",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:34.636905+08:00"
+              },
+              {
+                "lineNo": 562,
+                "sourceKey": "knowledge-tree-v7:1:1.7",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:34.701465+08:00"
+              },
+              {
+                "lineNo": 586,
+                "sourceKey": "knowledge-tree-v7:1:1.8",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:34.721502+08:00"
+              },
+              {
+                "lineNo": 658,
+                "sourceKey": "knowledge-tree-v7:1:1.9",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:34.781224+08:00"
+              },
+              {
+                "lineNo": 720,
+                "sourceKey": "knowledge-tree-v7:1:1.10",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:34.837525+08:00"
+              },
+              {
+                "lineNo": 727,
+                "sourceKey": "knowledge-tree-v7:1:1.11",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:34.844811+08:00"
+              },
+              {
+                "lineNo": 733,
+                "sourceKey": "knowledge-tree-v7:1:1.12",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:34.852115+08:00"
+              },
+              {
+                "lineNo": 740,
+                "sourceKey": "knowledge-tree-v7:1:1.13",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:34.860212+08:00"
+              },
+              {
+                "lineNo": 743,
+                "sourceKey": "knowledge-tree-v7:2:2.1",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:34.864375+08:00"
+              },
+              {
+                "lineNo": 748,
+                "sourceKey": "knowledge-tree-v7:2:2.2",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:34.87009+08:00"
+              },
+              {
+                "lineNo": 777,
+                "sourceKey": "knowledge-tree-v7:2:2.3",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:34.897118+08:00"
+              },
+              {
+                "lineNo": 805,
+                "sourceKey": "knowledge-tree-v7:2:2.4",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:34.920832+08:00"
+              },
+              {
+                "lineNo": 821,
+                "sourceKey": "knowledge-tree-v7:2:2.5",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:34.937541+08:00"
+              },
+              {
+                "lineNo": 835,
+                "sourceKey": "knowledge-tree-v7:2:2.6",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:34.9526+08:00"
+              },
+              {
+                "lineNo": 874,
+                "sourceKey": "knowledge-tree-v7:2:2.7",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:34.989575+08:00"
+              },
+              {
+                "lineNo": 903,
+                "sourceKey": "knowledge-tree-v7:2:2.8",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:35.019803+08:00"
+              },
+              {
+                "lineNo": 943,
+                "sourceKey": "knowledge-tree-v7:2:2.9",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:35.056019+08:00"
+              },
+              {
+                "lineNo": 1002,
+                "sourceKey": "knowledge-tree-v7:1:1.900001",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:35.110673+08:00"
+              },
+              {
+                "lineNo": 1003,
+                "sourceKey": "knowledge-tree-v7:1:1.900002",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:35.113163+08:00"
+              },
+              {
+                "lineNo": 1004,
+                "sourceKey": "knowledge-tree-v7:1:1.900003",
+                "fieldPath": "schema_version",
+                "severity": "error",
+                "issueCode": "KP_FIELD_TYPE_INVALID",
+                "message": "字段类型不正确",
+                "createTime": "2026-07-31T10:39:35.115312+08:00"
+              },
+              {
+                "lineNo": 1004,
+                "sourceKey": "knowledge-tree-v7:1:1.900003",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:35.116684+08:00"
+              },
+              {
+                "lineNo": 1005,
+                "sourceKey": "knowledge-tree-v7:1:1.900004",
+                "fieldPath": "schema_version",
+                "severity": "error",
+                "issueCode": "KP_SCHEMA_VERSION_UNSUPPORTED",
+                "message": "不支持的Schema版本",
+                "createTime": "2026-07-31T10:39:35.118794+08:00"
+              },
+              {
+                "lineNo": 1005,
+                "sourceKey": "knowledge-tree-v7:1:1.900004",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:35.1201+08:00"
+              },
+              {
+                "lineNo": 1006,
+                "sourceKey": "knowledge-tree-v7:1:1.900007",
+                "fieldPath": "status",
+                "severity": "error",
+                "issueCode": "KP_REQUIRED_FIELD_MISSING",
+                "message": "缺少必填字段status",
+                "createTime": "2026-07-31T10:39:35.122035+08:00"
+              },
+              {
+                "lineNo": 1006,
+                "sourceKey": "knowledge-tree-v7:1:1.900007",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:35.123112+08:00"
+              },
+              {
+                "lineNo": 1007,
+                "sourceKey": "knowledge-tree-v7:1:1.900008",
+                "fieldPath": "unexpected_field",
+                "severity": "error",
+                "issueCode": "KP_UNKNOWN_FIELD",
+                "message": "出现未知字段unexpected_field",
+                "createTime": "2026-07-31T10:39:35.125114+08:00"
+              },
+              {
+                "lineNo": 1007,
+                "sourceKey": "knowledge-tree-v7:1:1.900008",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:35.126142+08:00"
+              },
+              {
+                "lineNo": 1008,
+                "sourceKey": "knowledge-tree-v7:1:1.900009",
+                "fieldPath": "id",
+                "severity": "error",
+                "issueCode": "KP_UNKNOWN_FIELD",
+                "message": "出现未知字段id",
+                "createTime": "2026-07-31T10:39:35.128775+08:00"
+              },
+              {
+                "lineNo": 1008,
+                "sourceKey": "knowledge-tree-v7:1:1.900009",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:35.130099+08:00"
+              },
+              {
+                "lineNo": 1009,
+                "sourceKey": null,
+                "fieldPath": "source_key",
+                "severity": "error",
+                "issueCode": "KP_SOURCE_KEY_INVALID",
+                "message": "来源键格式不正确",
+                "createTime": "2026-07-31T10:39:35.132531+08:00"
+              },
+              {
+                "lineNo": 1009,
+                "sourceKey": null,
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:35.133808+08:00"
+              },
+              {
+                "lineNo": 1010,
+                "sourceKey": null,
+                "fieldPath": "source_key",
+                "severity": "error",
+                "issueCode": "KP_SOURCE_KEY_INVALID",
+                "message": "来源键格式不正确",
+                "createTime": "2026-07-31T10:39:35.135696+08:00"
+              },
+              {
+                "lineNo": 1010,
+                "sourceKey": null,
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:35.136758+08:00"
+              },
+              {
+                "lineNo": 1011,
+                "sourceKey": null,
+                "fieldPath": "source_key",
+                "severity": "error",
+                "issueCode": "KP_SOURCE_KEY_INVALID",
+                "message": "来源键格式不正确",
+                "createTime": "2026-07-31T10:39:35.138651+08:00"
+              },
+              {
+                "lineNo": 1011,
+                "sourceKey": null,
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:35.13985+08:00"
+              },
+              {
+                "lineNo": 1012,
+                "sourceKey": null,
+                "fieldPath": "source_key",
+                "severity": "error",
+                "issueCode": "KP_SOURCE_KEY_INVALID",
+                "message": "来源键格式不正确",
+                "createTime": "2026-07-31T10:39:35.142025+08:00"
+              },
+              {
+                "lineNo": 1012,
+                "sourceKey": null,
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:35.143134+08:00"
+              },
+              {
+                "lineNo": 1013,
+                "sourceKey": null,
+                "fieldPath": "source_key",
+                "severity": "error",
+                "issueCode": "KP_SOURCE_KEY_INVALID",
+                "message": "来源键格式不正确",
+                "createTime": "2026-07-31T10:39:35.145346+08:00"
+              },
+              {
+                "lineNo": 1013,
+                "sourceKey": null,
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:35.146499+08:00"
+              },
+              {
+                "lineNo": 1014,
+                "sourceKey": null,
+                "fieldPath": "subject_no",
+                "severity": "error",
+                "issueCode": "KP_SUBJECT_NO_INVALID",
+                "message": "科目编号只允许1至3",
+                "createTime": "2026-07-31T10:39:35.148481+08:00"
+              },
+              {
+                "lineNo": 1014,
+                "sourceKey": null,
+                "fieldPath": "source_key",
+                "severity": "error",
+                "issueCode": "KP_SOURCE_KEY_INVALID",
+                "message": "来源键格式不正确",
+                "createTime": "2026-07-31T10:39:35.149622+08:00"
+              },
+              {
+                "lineNo": 1014,
+                "sourceKey": null,
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:35.150655+08:00"
+              },
+              {
+                "lineNo": 1015,
+                "sourceKey": null,
+                "fieldPath": "subject_no",
+                "severity": "error",
+                "issueCode": "KP_SUBJECT_NO_INVALID",
+                "message": "科目编号只允许1至3",
+                "createTime": "2026-07-31T10:39:35.152627+08:00"
+              },
+              {
+                "lineNo": 1015,
+                "sourceKey": null,
+                "fieldPath": "source_key",
+                "severity": "error",
+                "issueCode": "KP_SOURCE_KEY_INVALID",
+                "message": "来源键格式不正确",
+                "createTime": "2026-07-31T10:39:35.153876+08:00"
+              },
+              {
+                "lineNo": 1015,
+                "sourceKey": null,
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:35.155069+08:00"
+              },
+              {
+                "lineNo": 1016,
+                "sourceKey": null,
+                "fieldPath": "subject_no",
+                "severity": "error",
+                "issueCode": "KP_FIELD_TYPE_INVALID",
+                "message": "字段类型不正确",
+                "createTime": "2026-07-31T10:39:35.157432+08:00"
+              },
+              {
+                "lineNo": 1016,
+                "sourceKey": null,
+                "fieldPath": "source_key",
+                "severity": "error",
+                "issueCode": "KP_SOURCE_KEY_INVALID",
+                "message": "来源键格式不正确",
+                "createTime": "2026-07-31T10:39:35.158575+08:00"
+              },
+              {
+                "lineNo": 1017,
+                "sourceKey": "knowledge-tree-v7:2:2.900010",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:35.160498+08:00"
+              },
+              {
+                "lineNo": 1018,
+                "sourceKey": null,
+                "fieldPath": "syllabus_number",
+                "severity": "error",
+                "issueCode": "KP_SYLLABUS_NUMBER_INVALID",
+                "message": "大纲编号格式不正确",
+                "createTime": "2026-07-31T10:39:35.162847+08:00"
+              },
+              {
+                "lineNo": 1018,
+                "sourceKey": null,
+                "fieldPath": "source_key",
+                "severity": "error",
+                "issueCode": "KP_SOURCE_KEY_INVALID",
+                "message": "来源键格式不正确",
+                "createTime": "2026-07-31T10:39:35.163913+08:00"
+              },
+              {
+                "lineNo": 1018,
+                "sourceKey": null,
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:35.165003+08:00"
+              },
+              {
+                "lineNo": 1019,
+                "sourceKey": null,
+                "fieldPath": "syllabus_number",
+                "severity": "error",
+                "issueCode": "KP_SYLLABUS_NUMBER_INVALID",
+                "message": "大纲编号格式不正确",
+                "createTime": "2026-07-31T10:39:35.168351+08:00"
+              },
+              {
+                "lineNo": 1019,
+                "sourceKey": null,
+                "fieldPath": "source_key",
+                "severity": "error",
+                "issueCode": "KP_SOURCE_KEY_INVALID",
+                "message": "来源键格式不正确",
+                "createTime": "2026-07-31T10:39:35.169737+08:00"
+              },
+              {
+                "lineNo": 1019,
+                "sourceKey": null,
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:35.170928+08:00"
+              },
+              {
+                "lineNo": 1020,
+                "sourceKey": null,
+                "fieldPath": "syllabus_number",
+                "severity": "error",
+                "issueCode": "KP_SYLLABUS_NUMBER_INVALID",
+                "message": "大纲编号格式不正确",
+                "createTime": "2026-07-31T10:39:35.172964+08:00"
+              },
+              {
+                "lineNo": 1020,
+                "sourceKey": null,
+                "fieldPath": "source_key",
+                "severity": "error",
+                "issueCode": "KP_SOURCE_KEY_INVALID",
+                "message": "来源键格式不正确",
+                "createTime": "2026-07-31T10:39:35.174444+08:00"
+              },
+              {
+                "lineNo": 1020,
+                "sourceKey": null,
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:35.175631+08:00"
+              },
+              {
+                "lineNo": 1021,
+                "sourceKey": null,
+                "fieldPath": "syllabus_number",
+                "severity": "error",
+                "issueCode": "KP_SYLLABUS_NUMBER_INVALID",
+                "message": "大纲编号格式不正确",
+                "createTime": "2026-07-31T10:39:35.177634+08:00"
+              },
+              {
+                "lineNo": 1021,
+                "sourceKey": null,
+                "fieldPath": "source_key",
+                "severity": "error",
+                "issueCode": "KP_SOURCE_KEY_INVALID",
+                "message": "来源键格式不正确",
+                "createTime": "2026-07-31T10:39:35.178754+08:00"
+              },
+              {
+                "lineNo": 1021,
+                "sourceKey": null,
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:35.179897+08:00"
+              },
+              {
+                "lineNo": 1022,
+                "sourceKey": null,
+                "fieldPath": "syllabus_number",
+                "severity": "error",
+                "issueCode": "KP_SUBJECT_NUMBER_MISMATCH",
+                "message": "编号首段与科目不一致",
+                "createTime": "2026-07-31T10:39:35.18177+08:00"
+              },
+              {
+                "lineNo": 1022,
+                "sourceKey": null,
+                "fieldPath": "source_key",
+                "severity": "error",
+                "issueCode": "KP_SOURCE_KEY_INVALID",
+                "message": "来源键格式不正确",
+                "createTime": "2026-07-31T10:39:35.182847+08:00"
+              },
+              {
+                "lineNo": 1022,
+                "sourceKey": null,
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:35.183907+08:00"
+              },
+              {
+                "lineNo": 1023,
+                "sourceKey": null,
+                "fieldPath": "syllabus_number",
+                "severity": "error",
+                "issueCode": "KP_FIELD_VALUE_INVALID",
+                "message": "大纲编号长度不能超过100",
+                "createTime": "2026-07-31T10:39:35.185682+08:00"
+              },
+              {
+                "lineNo": 1023,
+                "sourceKey": null,
+                "fieldPath": "source_key",
+                "severity": "error",
+                "issueCode": "KP_SOURCE_KEY_INVALID",
+                "message": "来源键格式不正确",
+                "createTime": "2026-07-31T10:39:35.187003+08:00"
+              },
+              {
+                "lineNo": 1023,
+                "sourceKey": null,
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:35.188025+08:00"
+              },
+              {
+                "lineNo": 1024,
+                "sourceKey": null,
+                "fieldPath": "syllabus_number",
+                "severity": "error",
+                "issueCode": "KP_FIELD_TYPE_INVALID",
+                "message": "字段类型不正确",
+                "createTime": "2026-07-31T10:39:35.189954+08:00"
+              },
+              {
+                "lineNo": 1024,
+                "sourceKey": null,
+                "fieldPath": "source_key",
+                "severity": "error",
+                "issueCode": "KP_SOURCE_KEY_INVALID",
+                "message": "来源键格式不正确",
+                "createTime": "2026-07-31T10:39:35.191061+08:00"
+              },
+              {
+                "lineNo": 1024,
+                "sourceKey": null,
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:35.19223+08:00"
+              },
+              {
+                "lineNo": 1025,
+                "sourceKey": "knowledge-tree-v7:1:1.900026",
+                "fieldPath": "syllabus_title",
+                "severity": "error",
+                "issueCode": "KP_FIELD_VALUE_INVALID",
+                "message": "知识点标题长度必须为1至500",
+                "createTime": "2026-07-31T10:39:35.194189+08:00"
+              },
+              {
+                "lineNo": 1025,
+                "sourceKey": "knowledge-tree-v7:1:1.900026",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:35.19523+08:00"
+              },
+              {
+                "lineNo": 1026,
+                "sourceKey": "knowledge-tree-v7:1:1.900027",
+                "fieldPath": "syllabus_title",
+                "severity": "error",
+                "issueCode": "KP_FIELD_VALUE_INVALID",
+                "message": "知识点标题长度必须为1至500",
+                "createTime": "2026-07-31T10:39:35.197149+08:00"
+              },
+              {
+                "lineNo": 1026,
+                "sourceKey": "knowledge-tree-v7:1:1.900027",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:35.198127+08:00"
+              },
+              {
+                "lineNo": 1027,
+                "sourceKey": "knowledge-tree-v7:1:1.900028",
+                "fieldPath": "syllabus_title",
+                "severity": "error",
+                "issueCode": "KP_FIELD_VALUE_INVALID",
+                "message": "知识点标题长度必须为1至500",
+                "createTime": "2026-07-31T10:39:35.19998+08:00"
+              },
+              {
+                "lineNo": 1027,
+                "sourceKey": "knowledge-tree-v7:1:1.900028",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:35.201022+08:00"
+              },
+              {
+                "lineNo": 1028,
+                "sourceKey": "knowledge-tree-v7:1:1.900029",
+                "fieldPath": "syllabus_title",
+                "severity": "error",
+                "issueCode": "KP_FIELD_TYPE_INVALID",
+                "message": "字段类型不正确",
+                "createTime": "2026-07-31T10:39:35.202781+08:00"
+              },
+              {
+                "lineNo": 1028,
+                "sourceKey": "knowledge-tree-v7:1:1.900029",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:35.203853+08:00"
+              },
+              {
+                "lineNo": 1029,
+                "sourceKey": "knowledge-tree-v7:1:1.900030",
+                "fieldPath": "parent_syllabus_number",
+                "severity": "error",
+                "issueCode": "KP_FIELD_TYPE_INVALID",
+                "message": "字段类型不正确",
+                "createTime": "2026-07-31T10:39:35.20584+08:00"
+              },
+              {
+                "lineNo": 1029,
+                "sourceKey": "knowledge-tree-v7:1:1.900030",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:35.207165+08:00"
+              },
+              {
+                "lineNo": 1030,
+                "sourceKey": "knowledge-tree-v7:1:1.900031",
+                "fieldPath": "parent_syllabus_number",
+                "severity": "error",
+                "issueCode": "KP_SYLLABUS_NUMBER_INVALID",
+                "message": "父节点编号格式不正确",
+                "createTime": "2026-07-31T10:39:35.209371+08:00"
+              },
+              {
+                "lineNo": 1030,
+                "sourceKey": "knowledge-tree-v7:1:1.900031",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:35.210542+08:00"
+              },
+              {
+                "lineNo": 1031,
+                "sourceKey": "knowledge-tree-v7:1:1.900032",
+                "fieldPath": "parent_syllabus_number",
+                "severity": "error",
+                "issueCode": "KP_PARENT_NOT_FOUND",
+                "message": "父节点不存在",
+                "createTime": "2026-07-31T10:39:35.212355+08:00"
+              },
+              {
+                "lineNo": 1031,
+                "sourceKey": "knowledge-tree-v7:1:1.900032",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:35.213311+08:00"
+              },
+              {
+                "lineNo": 1032,
+                "sourceKey": "knowledge-tree-v7:1:1.900035",
+                "fieldPath": "parent_syllabus_number",
+                "severity": "error",
+                "issueCode": "KP_PARENT_ORDER_INVALID",
+                "message": "父节点必须早于子节点",
+                "createTime": "2026-07-31T10:39:35.215542+08:00"
+              },
+              {
+                "lineNo": 1032,
+                "sourceKey": "knowledge-tree-v7:1:1.900035",
+                "fieldPath": "parent_syllabus_number",
+                "severity": "error",
+                "issueCode": "KP_TREE_CYCLE",
+                "message": "该行形成循环引用",
+                "createTime": "2026-07-31T10:39:35.216504+08:00"
+              },
+              {
+                "lineNo": 1032,
+                "sourceKey": "knowledge-tree-v7:1:1.900035",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:35.217513+08:00"
+              },
+              {
+                "lineNo": 1033,
+                "sourceKey": "knowledge-tree-v7:1:1.900036",
+                "fieldPath": "tree_depth",
+                "severity": "error",
+                "issueCode": "KP_FIELD_VALUE_INVALID",
+                "message": "树层级必须为1至32767",
+                "createTime": "2026-07-31T10:39:35.21938+08:00"
+              },
+              {
+                "lineNo": 1033,
+                "sourceKey": "knowledge-tree-v7:1:1.900036",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:35.22065+08:00"
+              },
+              {
+                "lineNo": 1034,
+                "sourceKey": "knowledge-tree-v7:1:1.900037",
+                "fieldPath": "tree_depth",
+                "severity": "error",
+                "issueCode": "KP_FIELD_VALUE_INVALID",
+                "message": "树层级必须为1至32767",
+                "createTime": "2026-07-31T10:39:35.222837+08:00"
+              },
+              {
+                "lineNo": 1034,
+                "sourceKey": "knowledge-tree-v7:1:1.900037",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:35.223958+08:00"
+              },
+              {
+                "lineNo": 1035,
+                "sourceKey": "knowledge-tree-v7:1:1.900038",
+                "fieldPath": "tree_depth",
+                "severity": "error",
+                "issueCode": "KP_FIELD_VALUE_INVALID",
+                "message": "树层级必须为1至32767",
+                "createTime": "2026-07-31T10:39:35.225975+08:00"
+              },
+              {
+                "lineNo": 1035,
+                "sourceKey": "knowledge-tree-v7:1:1.900038",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:35.226888+08:00"
+              },
+              {
+                "lineNo": 1036,
+                "sourceKey": "knowledge-tree-v7:1:1.900039",
+                "fieldPath": "tree_depth",
+                "severity": "error",
+                "issueCode": "KP_FIELD_TYPE_INVALID",
+                "message": "字段类型不正确",
+                "createTime": "2026-07-31T10:39:35.229421+08:00"
+              },
+              {
+                "lineNo": 1036,
+                "sourceKey": "knowledge-tree-v7:1:1.900039",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:35.230592+08:00"
+              },
+              {
+                "lineNo": 1037,
+                "sourceKey": "knowledge-tree-v7:1:1.900040",
+                "fieldPath": "tree_depth",
+                "severity": "error",
+                "issueCode": "KP_TREE_DEPTH_INVALID",
+                "message": "根节点层级必须为1",
+                "createTime": "2026-07-31T10:39:35.232519+08:00"
+              }
+            ]
+          },
+          "msg": "操作成功"
+        },
+        "headers": {
+          "content-length": "21860",
+          "content-type": "application/json;charset=utf-8",
+          "date": "Fri, 31 Jul 2026 02:39:35 GMT",
+          "vary": "Origin, Access-Control-Request-Method, Access-Control-Request-Headers"
+        }
+      }
+    },
+    {
+      "name": "batch 2083019702477496320 issues page 2",
+      "passed": true,
+      "details": {
+        "status": 200,
+        "body": {
+          "code": 200,
+          "data": {
+            "total": 153,
+            "rows": [
+              {
+                "lineNo": 1037,
+                "sourceKey": "knowledge-tree-v7:1:1.900040",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:35.23354+08:00"
+              },
+              {
+                "lineNo": 1038,
+                "sourceKey": "knowledge-tree-v7:1:1.900041",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_FIELD_VALUE_INVALID",
+                "message": "同级排序必须从1开始",
+                "createTime": "2026-07-31T10:39:35.235277+08:00"
+              },
+              {
+                "lineNo": 1039,
+                "sourceKey": "knowledge-tree-v7:1:1.900042",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_FIELD_VALUE_INVALID",
+                "message": "同级排序必须从1开始",
+                "createTime": "2026-07-31T10:39:35.237226+08:00"
+              },
+              {
+                "lineNo": 1040,
+                "sourceKey": "knowledge-tree-v7:1:1.900043",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_FIELD_VALUE_INVALID",
+                "message": "整数超出32位有符号整数范围",
+                "createTime": "2026-07-31T10:39:35.239127+08:00"
+              },
+              {
+                "lineNo": 1041,
+                "sourceKey": "knowledge-tree-v7:1:1.900044",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_FIELD_TYPE_INVALID",
+                "message": "字段类型不正确",
+                "createTime": "2026-07-31T10:39:35.241154+08:00"
+              },
+              {
+                "lineNo": 1042,
+                "sourceKey": "knowledge-tree-v7:1:1.900045",
+                "fieldPath": "description",
+                "severity": "error",
+                "issueCode": "KP_FIELD_VALUE_INVALID",
+                "message": "说明不能使用空字符串",
+                "createTime": "2026-07-31T10:39:35.243104+08:00"
+              },
+              {
+                "lineNo": 1042,
+                "sourceKey": "knowledge-tree-v7:1:1.900045",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:35.244155+08:00"
+              },
+              {
+                "lineNo": 1043,
+                "sourceKey": "knowledge-tree-v7:1:1.900046",
+                "fieldPath": "description",
+                "severity": "error",
+                "issueCode": "KP_FIELD_TYPE_INVALID",
+                "message": "字段类型不正确",
+                "createTime": "2026-07-31T10:39:35.246111+08:00"
+              },
+              {
+                "lineNo": 1043,
+                "sourceKey": "knowledge-tree-v7:1:1.900046",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:35.247203+08:00"
+              },
+              {
+                "lineNo": 1044,
+                "sourceKey": "knowledge-tree-v7:1:1.900047",
+                "fieldPath": "importance",
+                "severity": "error",
+                "issueCode": "KP_FIELD_VALUE_INVALID",
+                "message": "重要度必须为null",
+                "createTime": "2026-07-31T10:39:35.248964+08:00"
+              },
+              {
+                "lineNo": 1044,
+                "sourceKey": "knowledge-tree-v7:1:1.900047",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:35.250174+08:00"
+              },
+              {
+                "lineNo": 1045,
+                "sourceKey": "knowledge-tree-v7:1:1.900048",
+                "fieldPath": "importance",
+                "severity": "error",
+                "issueCode": "KP_FIELD_VALUE_INVALID",
+                "message": "重要度必须为null",
+                "createTime": "2026-07-31T10:39:35.251992+08:00"
+              },
+              {
+                "lineNo": 1045,
+                "sourceKey": "knowledge-tree-v7:1:1.900048",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:35.253101+08:00"
+              },
+              {
+                "lineNo": 1046,
+                "sourceKey": "knowledge-tree-v7:1:1.900049",
+                "fieldPath": "diagnostic_enabled",
+                "severity": "error",
+                "issueCode": "KP_FIELD_VALUE_INVALID",
+                "message": "开关必须为false",
+                "createTime": "2026-07-31T10:39:35.255089+08:00"
+              },
+              {
+                "lineNo": 1046,
+                "sourceKey": "knowledge-tree-v7:1:1.900049",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:35.256119+08:00"
+              },
+              {
+                "lineNo": 1047,
+                "sourceKey": "knowledge-tree-v7:1:1.900050",
+                "fieldPath": "diagnostic_enabled",
+                "severity": "error",
+                "issueCode": "KP_FIELD_TYPE_INVALID",
+                "message": "字段类型不正确",
+                "createTime": "2026-07-31T10:39:35.258061+08:00"
+              },
+              {
+                "lineNo": 1047,
+                "sourceKey": "knowledge-tree-v7:1:1.900050",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:35.259226+08:00"
+              },
+              {
+                "lineNo": 1048,
+                "sourceKey": "knowledge-tree-v7:1:1.900051",
+                "fieldPath": "recommendation_enabled",
+                "severity": "error",
+                "issueCode": "KP_FIELD_VALUE_INVALID",
+                "message": "开关必须为false",
+                "createTime": "2026-07-31T10:39:35.2613+08:00"
+              },
+              {
+                "lineNo": 1048,
+                "sourceKey": "knowledge-tree-v7:1:1.900051",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:35.262348+08:00"
+              },
+              {
+                "lineNo": 1049,
+                "sourceKey": "knowledge-tree-v7:1:1.900052",
+                "fieldPath": "recommendation_enabled",
+                "severity": "error",
+                "issueCode": "KP_FIELD_TYPE_INVALID",
+                "message": "字段类型不正确",
+                "createTime": "2026-07-31T10:39:35.264255+08:00"
+              },
+              {
+                "lineNo": 1049,
+                "sourceKey": "knowledge-tree-v7:1:1.900052",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:35.265225+08:00"
+              },
+              {
+                "lineNo": 1050,
+                "sourceKey": "knowledge-tree-v7:1:1.900053",
+                "fieldPath": "status",
+                "severity": "error",
+                "issueCode": "KP_FIELD_VALUE_INVALID",
+                "message": "状态必须为0",
+                "createTime": "2026-07-31T10:39:35.267436+08:00"
+              },
+              {
+                "lineNo": 1050,
+                "sourceKey": "knowledge-tree-v7:1:1.900053",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:35.268428+08:00"
+              },
+              {
+                "lineNo": 1051,
+                "sourceKey": "knowledge-tree-v7:1:1.900054",
+                "fieldPath": "status",
+                "severity": "error",
+                "issueCode": "KP_FIELD_TYPE_INVALID",
+                "message": "字段类型不正确",
+                "createTime": "2026-07-31T10:39:35.270517+08:00"
+              },
+              {
+                "lineNo": 1051,
+                "sourceKey": "knowledge-tree-v7:1:1.900054",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:35.271594+08:00"
+              },
+              {
+                "lineNo": 1052,
+                "sourceKey": "knowledge-tree-v7:1:1.900055",
+                "fieldPath": "status",
+                "severity": "error",
+                "issueCode": "KP_FIELD_VALUE_INVALID",
+                "message": "状态必须为0",
+                "createTime": "2026-07-31T10:39:35.273566+08:00"
+              },
+              {
+                "lineNo": 1052,
+                "sourceKey": "knowledge-tree-v7:1:1.900055",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:35.274785+08:00"
+              },
+              {
+                "lineNo": 1053,
+                "sourceKey": "knowledge-tree-v7:1:1.900056",
+                "fieldPath": "source_key",
+                "severity": "error",
+                "issueCode": "KP_DUPLICATE_SOURCE_KEY",
+                "message": "来源键重复",
+                "createTime": "2026-07-31T10:39:35.276631+08:00"
+              },
+              {
+                "lineNo": 1053,
+                "sourceKey": "knowledge-tree-v7:1:1.900056",
+                "fieldPath": "syllabus_number",
+                "severity": "error",
+                "issueCode": "KP_DUPLICATE_SYLLABUS_NUMBER",
+                "message": "科目内大纲编号重复",
+                "createTime": "2026-07-31T10:39:35.277596+08:00"
+              },
+              {
+                "lineNo": 1053,
+                "sourceKey": "knowledge-tree-v7:1:1.900056",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:35.278646+08:00"
+              },
+              {
+                "lineNo": 1054,
+                "sourceKey": "knowledge-tree-v7:1:1.900056",
+                "fieldPath": "source_key",
+                "severity": "error",
+                "issueCode": "KP_DUPLICATE_SOURCE_KEY",
+                "message": "来源键重复",
+                "createTime": "2026-07-31T10:39:35.280485+08:00"
+              },
+              {
+                "lineNo": 1054,
+                "sourceKey": "knowledge-tree-v7:1:1.900056",
+                "fieldPath": "syllabus_number",
+                "severity": "error",
+                "issueCode": "KP_DUPLICATE_SYLLABUS_NUMBER",
+                "message": "科目内大纲编号重复",
+                "createTime": "2026-07-31T10:39:35.281536+08:00"
+              },
+              {
+                "lineNo": 1054,
+                "sourceKey": "knowledge-tree-v7:1:1.900056",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:35.282693+08:00"
+              },
+              {
+                "lineNo": 1055,
+                "sourceKey": "knowledge-tree-v7:1:1.900058",
+                "fieldPath": "parent_syllabus_number",
+                "severity": "error",
+                "issueCode": "KP_PARENT_ORDER_INVALID",
+                "message": "父节点必须早于子节点",
+                "createTime": "2026-07-31T10:39:35.284716+08:00"
+              },
+              {
+                "lineNo": 1055,
+                "sourceKey": "knowledge-tree-v7:1:1.900058",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:35.285829+08:00"
+              },
+              {
+                "lineNo": 1056,
+                "sourceKey": "knowledge-tree-v7:1:1.990001",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:35.287753+08:00"
+              },
+              {
+                "lineNo": 1057,
+                "sourceKey": "knowledge-tree-v7:1:1.990002",
+                "fieldPath": "syllabus_title",
+                "severity": "error",
+                "issueCode": "KP_FIELD_VALUE_INVALID",
+                "message": "知识点标题长度必须为1至500",
+                "createTime": "2026-07-31T10:39:35.289462+08:00"
+              },
+              {
+                "lineNo": 1057,
+                "sourceKey": "knowledge-tree-v7:1:1.990002",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:35.2904+08:00"
+              },
+              {
+                "lineNo": 1058,
+                "sourceKey": "knowledge-tree-v7:1:1.900061",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:35.29236+08:00"
+              },
+              {
+                "lineNo": 1059,
+                "sourceKey": "knowledge-tree-v7:1:1.990003",
+                "fieldPath": "parent_syllabus_number",
+                "severity": "error",
+                "issueCode": "KP_PARENT_ORDER_INVALID",
+                "message": "父节点必须早于子节点",
+                "createTime": "2026-07-31T10:39:35.294153+08:00"
+              },
+              {
+                "lineNo": 1059,
+                "sourceKey": "knowledge-tree-v7:1:1.990003",
+                "fieldPath": "parent_syllabus_number",
+                "severity": "error",
+                "issueCode": "KP_TREE_CYCLE",
+                "message": "该行形成循环引用",
+                "createTime": "2026-07-31T10:39:35.295281+08:00"
+              },
+              {
+                "lineNo": 1059,
+                "sourceKey": "knowledge-tree-v7:1:1.990003",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:35.29636+08:00"
+              },
+              {
+                "lineNo": 1060,
+                "sourceKey": "knowledge-tree-v7:1:1.990004",
+                "fieldPath": "parent_syllabus_number",
+                "severity": "error",
+                "issueCode": "KP_TREE_CYCLE",
+                "message": "该行形成循环引用",
+                "createTime": "2026-07-31T10:39:35.298402+08:00"
+              },
+              {
+                "lineNo": 1060,
+                "sourceKey": "knowledge-tree-v7:1:1.990004",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:35.299594+08:00"
+              },
+              {
+                "lineNo": 1061,
+                "sourceKey": null,
+                "fieldPath": "$line[1061]",
+                "severity": "error",
+                "issueCode": "KP_JSON_INVALID",
+                "message": "第1061行不是合法JSON对象",
+                "createTime": "2026-07-31T10:39:33.982513+08:00"
+              },
+              {
+                "lineNo": 1062,
+                "sourceKey": null,
+                "fieldPath": "$line[1062]",
+                "severity": "error",
+                "issueCode": "KP_JSON_INVALID",
+                "message": "第1062行不是合法JSON对象",
+                "createTime": "2026-07-31T10:39:33.984151+08:00"
+              },
+              {
+                "lineNo": 1063,
+                "sourceKey": null,
+                "fieldPath": "$line[1063]",
+                "severity": "error",
+                "issueCode": "KP_JSON_INVALID",
+                "message": "第1063行不是合法JSON对象",
+                "createTime": "2026-07-31T10:39:33.985545+08:00"
+              },
+              {
+                "lineNo": 1064,
+                "sourceKey": null,
+                "fieldPath": "$line[1064]",
+                "severity": "error",
+                "issueCode": "KP_JSON_INVALID",
+                "message": "第1064行不是合法JSON对象",
+                "createTime": "2026-07-31T10:39:33.987111+08:00"
+              },
+              {
+                "lineNo": 1065,
+                "sourceKey": null,
+                "fieldPath": "$line[1065]",
+                "severity": "error",
+                "issueCode": "KP_JSON_INVALID",
+                "message": "第1065行不是合法JSON对象",
+                "createTime": "2026-07-31T10:39:33.988714+08:00"
+              },
+              {
+                "lineNo": 1066,
+                "sourceKey": null,
+                "fieldPath": "$line[1066]",
+                "severity": "error",
+                "issueCode": "KP_JSON_INVALID",
+                "message": "第1066行不是合法JSON对象",
+                "createTime": "2026-07-31T10:39:33.990008+08:00"
+              },
+              {
+                "lineNo": 1067,
+                "sourceKey": null,
+                "fieldPath": "$line[1067]",
+                "severity": "error",
+                "issueCode": "KP_JSON_INVALID",
+                "message": "第1067行不是合法JSON对象",
+                "createTime": "2026-07-31T10:39:33.991522+08:00"
+              },
+              {
+                "lineNo": 1068,
+                "sourceKey": null,
+                "fieldPath": "$line[1068]",
+                "severity": "error",
+                "issueCode": "KP_JSON_DUPLICATE_KEY",
+                "message": "第1068行不是合法JSON对象",
+                "createTime": "2026-07-31T10:39:33.993644+08:00"
+              },
+              {
+                "lineNo": 1069,
+                "sourceKey": null,
+                "fieldPath": "$line[1069]",
+                "severity": "error",
+                "issueCode": "KP_JSON_LINE_TOO_LARGE",
+                "message": "第1069行超过单行大小限制",
+                "createTime": "2026-07-31T10:39:34.014832+08:00"
+              }
+            ]
+          },
+          "msg": "操作成功"
+        },
+        "headers": {
+          "content-length": "11963",
+          "content-type": "application/json;charset=utf-8",
+          "date": "Fri, 31 Jul 2026 02:39:35 GMT",
+          "vary": "Origin, Access-Control-Request-Method, Access-Control-Request-Headers"
+        }
+      }
+    },
+    {
+      "name": "edge fixture produces validation failures",
+      "passed": true,
+      "details": {
+        "id": "2083019702477496320",
+        "status": "waiting_confirm",
+        "currentStage": "finalize_counts",
+        "progressPercent": "100.00",
+        "totalCount": 1069,
+        "validCount": 979,
+        "warningCount": 0,
+        "failedCount": 90,
+        "startedTime": "2026-07-31T10:39:32.401697+08:00",
+        "finishedTime": "2026-07-31T10:39:35.30257+08:00",
+        "failureTraceId": null
+      }
+    },
+    {
+      "name": "all declared primary edge issue codes are observed",
+      "passed": true,
+      "details": {
+        "missing": [],
+        "expected": 65,
+        "actual": 153
+      }
+    },
+    {
+      "name": "unmapped-subject fixture uploads",
+      "passed": true,
+      "details": {
+        "status": 200,
+        "body": {
+          "code": 200,
+          "data": {
+            "id": "2083019715886686208",
+            "importType": "knowledge_point",
+            "syllabusVersionId": "900000000000000021",
+            "templateVersion": "knowledge_point/1.0",
+            "status": "uploaded",
+            "reused": false,
+            "createTime": "2026-07-31T10:39:35.57641454+08:00"
+          },
+          "msg": "操作成功"
+        },
+        "headers": {
+          "content-length": "266",
+          "content-type": "application/json;charset=utf-8",
+          "date": "Fri, 31 Jul 2026 02:39:35 GMT",
+          "vary": "Origin, Access-Control-Request-Method, Access-Control-Request-Headers"
+        }
+      }
+    },
+    {
+      "name": "batch 2083019715886686208 validate accepted",
+      "passed": true,
+      "details": {
+        "status": 200,
+        "body": {
+          "code": 200,
+          "data": {
+            "id": "2083019715886686208",
+            "status": "parsing",
+            "currentStage": "read_jsonl",
+            "accepted": true
+          },
+          "msg": "预检任务已受理"
+        },
+        "headers": {
+          "content-length": "141",
+          "content-type": "application/json;charset=utf-8",
+          "date": "Fri, 31 Jul 2026 02:39:35 GMT",
+          "vary": "Origin, Access-Control-Request-Method, Access-Control-Request-Headers"
+        }
+      }
+    },
+    {
+      "name": "batch 2083019715886686208 reached terminal precheck state",
+      "passed": true,
+      "details": {
+        "status": 200,
+        "body": {
+          "code": 200,
+          "data": {
+            "id": "2083019715886686208",
+            "status": "waiting_confirm",
+            "currentStage": "finalize_counts",
+            "progressPercent": "100.00",
+            "totalCount": 1,
+            "validCount": 0,
+            "warningCount": 0,
+            "failedCount": 1,
+            "startedTime": "2026-07-31T10:39:35.589584+08:00",
+            "finishedTime": "2026-07-31T10:39:36.329642+08:00",
+            "failureTraceId": null
+          },
+          "msg": "操作成功"
+        },
+        "headers": {
+          "content-length": "340",
+          "content-type": "application/json;charset=utf-8",
+          "date": "Fri, 31 Jul 2026 02:39:36 GMT",
+          "vary": "Origin, Access-Control-Request-Method, Access-Control-Request-Headers"
+        }
+      }
+    },
+    {
+      "name": "batch 2083019715886686208 issues page 1",
+      "passed": true,
+      "details": {
+        "status": 200,
+        "body": {
+          "code": 200,
+          "data": {
+            "total": 2,
+            "rows": [
+              {
+                "lineNo": 1,
+                "sourceKey": "knowledge-tree-v7:2:2.900010",
+                "fieldPath": "subject_no",
+                "severity": "error",
+                "issueCode": "KP_SUBJECT_MAPPING_UNKNOWN",
+                "message": "科目编号没有显式映射",
+                "createTime": "2026-07-31T10:39:36.325935+08:00"
+              },
+              {
+                "lineNo": 1,
+                "sourceKey": "knowledge-tree-v7:2:2.900010",
+                "fieldPath": "sort_order",
+                "severity": "error",
+                "issueCode": "KP_SORT_ORDER_INVALID",
+                "message": "同级排序重复或不连续",
+                "createTime": "2026-07-31T10:39:36.327+08:00"
+              }
+            ]
+          },
+          "msg": "操作成功"
+        },
+        "headers": {
+          "content-length": "517",
+          "content-type": "application/json;charset=utf-8",
+          "date": "Fri, 31 Jul 2026 02:39:36 GMT",
+          "vary": "Origin, Access-Control-Request-Method, Access-Control-Request-Headers"
+        }
+      }
+    },
+    {
+      "name": "missing explicit subject mapping is reported",
+      "passed": true,
+      "details": [
+        {
+          "lineNo": 1,
+          "sourceKey": "knowledge-tree-v7:2:2.900010",
+          "fieldPath": "subject_no",
+          "severity": "error",
+          "issueCode": "KP_SUBJECT_MAPPING_UNKNOWN",
+          "message": "科目编号没有显式映射",
+          "createTime": "2026-07-31T10:39:36.325935+08:00"
+        },
+        {
+          "lineNo": 1,
+          "sourceKey": "knowledge-tree-v7:2:2.900010",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:36.327+08:00"
+        }
+      ]
+    },
+    {
+      "name": "knowledge-point-v7-valid-crlf.jsonl upload status",
+      "passed": true,
+      "details": {
+        "status": 200,
+        "body": {
+          "code": 200,
+          "data": {
+            "id": "2083019720521392128",
+            "importType": "knowledge_point",
+            "syllabusVersionId": "900000000000000021",
+            "templateVersion": "knowledge_point/1.0",
+            "status": "uploaded",
+            "reused": false,
+            "createTime": "2026-07-31T10:39:36.68339412+08:00"
+          },
+          "msg": "操作成功"
+        },
+        "headers": {
+          "content-length": "266",
+          "content-type": "application/json;charset=utf-8",
+          "date": "Fri, 31 Jul 2026 02:39:36 GMT",
+          "vary": "Origin, Access-Control-Request-Method, Access-Control-Request-Headers"
+        }
+      }
+    },
+    {
+      "name": "knowledge-point-v7-valid-no-final-newline.jsonl upload status",
+      "passed": true,
+      "details": {
+        "status": 200,
+        "body": {
+          "code": 200,
+          "data": {
+            "id": "2083019720672387072",
+            "importType": "knowledge_point",
+            "syllabusVersionId": "900000000000000021",
+            "templateVersion": "knowledge_point/1.0",
+            "status": "uploaded",
+            "reused": false,
+            "createTime": "2026-07-31T10:39:36.719709023+08:00"
+          },
+          "msg": "操作成功"
+        },
+        "headers": {
+          "content-length": "267",
+          "content-type": "application/json;charset=utf-8",
+          "date": "Fri, 31 Jul 2026 02:39:36 GMT",
+          "vary": "Origin, Access-Control-Request-Method, Access-Control-Request-Headers"
+        }
+      }
+    },
+    {
+      "name": "knowledge-point-v7-valid-with-bom.jsonl upload status",
+      "passed": true,
+      "details": {
+        "status": 400,
+        "body": {
+          "code": 400,
+          "data": {
+            "errorCode": "IMPORT_FILE_INVALID",
+            "retryable": false,
+            "traceId": null,
+            "fieldErrors": []
+          },
+          "msg": "文件不能包含UTF-8 BOM"
+        },
+        "headers": {
+          "content-type": "application/json",
+          "date": "Fri, 31 Jul 2026 02:39:36 GMT",
+          "transfer-encoding": "chunked",
+          "vary": "Origin, Access-Control-Request-Method, Access-Control-Request-Headers"
+        }
+      }
+    },
+    {
+      "name": "knowledge-point-invalid-utf8.jsonl upload status",
+      "passed": true,
+      "details": {
+        "status": 400,
+        "body": {
+          "code": 400,
+          "data": {
+            "errorCode": "IMPORT_FILE_INVALID",
+            "retryable": false,
+            "traceId": null,
+            "fieldErrors": []
+          },
+          "msg": "文件不是合法UTF-8"
+        },
+        "headers": {
+          "content-type": "application/json",
+          "date": "Fri, 31 Jul 2026 02:39:36 GMT",
+          "transfer-encoding": "chunked",
+          "vary": "Origin, Access-Control-Request-Method, Access-Control-Request-Headers"
+        }
+      }
+    },
+    {
+      "name": "unknown batch returns 404",
+      "passed": true,
+      "details": {
+        "status": 404,
+        "body": {
+          "code": 404,
+          "data": {
+            "errorCode": "IMPORT_BATCH_NOT_FOUND",
+            "retryable": false,
+            "traceId": null,
+            "fieldErrors": []
+          },
+          "msg": "导入批次不存在或不可见"
+        },
+        "headers": {
+          "content-type": "application/json",
+          "date": "Fri, 31 Jul 2026 02:39:36 GMT",
+          "transfer-encoding": "chunked",
+          "vary": "Origin, Access-Control-Request-Method, Access-Control-Request-Headers"
+        }
+      }
+    }
+  ],
+  "batches": {
+    "valid": {
+      "id": "2083019691110932480",
+      "create": {
+        "id": "2083019691110932480",
+        "importType": "knowledge_point",
+        "syllabusVersionId": "900000000000000021",
+        "templateVersion": "knowledge_point/1.0",
+        "status": "uploaded",
+        "reused": false,
+        "createTime": "2026-07-31T10:39:29.676308157+08:00"
+      },
+      "progress": {
+        "id": "2083019691110932480",
+        "status": "waiting_confirm",
+        "currentStage": "finalize_counts",
+        "progressPercent": "100.00",
+        "totalCount": 1001,
+        "validCount": 1001,
+        "warningCount": 0,
+        "failedCount": 0,
+        "startedTime": "2026-07-31T10:39:29.738232+08:00",
+        "finishedTime": "2026-07-31T10:39:31.944531+08:00",
+        "failureTraceId": null
+      },
+      "issues": []
+    },
+    "edge": {
+      "id": "2083019702477496320",
+      "create": {
+        "id": "2083019702477496320",
+        "importType": "knowledge_point",
+        "syllabusVersionId": "900000000000000021",
+        "templateVersion": "knowledge_point/1.0",
+        "status": "uploaded",
+        "reused": false,
+        "createTime": "2026-07-31T10:39:32.38761322+08:00"
+      },
+      "progress": {
+        "id": "2083019702477496320",
+        "status": "waiting_confirm",
+        "currentStage": "finalize_counts",
+        "progressPercent": "100.00",
+        "totalCount": 1069,
+        "validCount": 979,
+        "warningCount": 0,
+        "failedCount": 90,
+        "startedTime": "2026-07-31T10:39:32.401697+08:00",
+        "finishedTime": "2026-07-31T10:39:35.30257+08:00",
+        "failureTraceId": null
+      },
+      "issues": [
+        {
+          "lineNo": 1,
+          "sourceKey": "knowledge-tree-v7:1:1.1",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:34.055683+08:00"
+        },
+        {
+          "lineNo": 139,
+          "sourceKey": "knowledge-tree-v7:1:1.2",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:34.257945+08:00"
+        },
+        {
+          "lineNo": 224,
+          "sourceKey": "knowledge-tree-v7:1:1.3",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:34.359338+08:00"
+        },
+        {
+          "lineNo": 305,
+          "sourceKey": "knowledge-tree-v7:1:1.4",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:34.446276+08:00"
+        },
+        {
+          "lineNo": 413,
+          "sourceKey": "knowledge-tree-v7:1:1.5",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:34.563283+08:00"
+        },
+        {
+          "lineNo": 487,
+          "sourceKey": "knowledge-tree-v7:1:1.6",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:34.636905+08:00"
+        },
+        {
+          "lineNo": 562,
+          "sourceKey": "knowledge-tree-v7:1:1.7",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:34.701465+08:00"
+        },
+        {
+          "lineNo": 586,
+          "sourceKey": "knowledge-tree-v7:1:1.8",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:34.721502+08:00"
+        },
+        {
+          "lineNo": 658,
+          "sourceKey": "knowledge-tree-v7:1:1.9",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:34.781224+08:00"
+        },
+        {
+          "lineNo": 720,
+          "sourceKey": "knowledge-tree-v7:1:1.10",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:34.837525+08:00"
+        },
+        {
+          "lineNo": 727,
+          "sourceKey": "knowledge-tree-v7:1:1.11",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:34.844811+08:00"
+        },
+        {
+          "lineNo": 733,
+          "sourceKey": "knowledge-tree-v7:1:1.12",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:34.852115+08:00"
+        },
+        {
+          "lineNo": 740,
+          "sourceKey": "knowledge-tree-v7:1:1.13",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:34.860212+08:00"
+        },
+        {
+          "lineNo": 743,
+          "sourceKey": "knowledge-tree-v7:2:2.1",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:34.864375+08:00"
+        },
+        {
+          "lineNo": 748,
+          "sourceKey": "knowledge-tree-v7:2:2.2",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:34.87009+08:00"
+        },
+        {
+          "lineNo": 777,
+          "sourceKey": "knowledge-tree-v7:2:2.3",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:34.897118+08:00"
+        },
+        {
+          "lineNo": 805,
+          "sourceKey": "knowledge-tree-v7:2:2.4",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:34.920832+08:00"
+        },
+        {
+          "lineNo": 821,
+          "sourceKey": "knowledge-tree-v7:2:2.5",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:34.937541+08:00"
+        },
+        {
+          "lineNo": 835,
+          "sourceKey": "knowledge-tree-v7:2:2.6",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:34.9526+08:00"
+        },
+        {
+          "lineNo": 874,
+          "sourceKey": "knowledge-tree-v7:2:2.7",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:34.989575+08:00"
+        },
+        {
+          "lineNo": 903,
+          "sourceKey": "knowledge-tree-v7:2:2.8",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:35.019803+08:00"
+        },
+        {
+          "lineNo": 943,
+          "sourceKey": "knowledge-tree-v7:2:2.9",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:35.056019+08:00"
+        },
+        {
+          "lineNo": 1002,
+          "sourceKey": "knowledge-tree-v7:1:1.900001",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:35.110673+08:00"
+        },
+        {
+          "lineNo": 1003,
+          "sourceKey": "knowledge-tree-v7:1:1.900002",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:35.113163+08:00"
+        },
+        {
+          "lineNo": 1004,
+          "sourceKey": "knowledge-tree-v7:1:1.900003",
+          "fieldPath": "schema_version",
+          "severity": "error",
+          "issueCode": "KP_FIELD_TYPE_INVALID",
+          "message": "字段类型不正确",
+          "createTime": "2026-07-31T10:39:35.115312+08:00"
+        },
+        {
+          "lineNo": 1004,
+          "sourceKey": "knowledge-tree-v7:1:1.900003",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:35.116684+08:00"
+        },
+        {
+          "lineNo": 1005,
+          "sourceKey": "knowledge-tree-v7:1:1.900004",
+          "fieldPath": "schema_version",
+          "severity": "error",
+          "issueCode": "KP_SCHEMA_VERSION_UNSUPPORTED",
+          "message": "不支持的Schema版本",
+          "createTime": "2026-07-31T10:39:35.118794+08:00"
+        },
+        {
+          "lineNo": 1005,
+          "sourceKey": "knowledge-tree-v7:1:1.900004",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:35.1201+08:00"
+        },
+        {
+          "lineNo": 1006,
+          "sourceKey": "knowledge-tree-v7:1:1.900007",
+          "fieldPath": "status",
+          "severity": "error",
+          "issueCode": "KP_REQUIRED_FIELD_MISSING",
+          "message": "缺少必填字段status",
+          "createTime": "2026-07-31T10:39:35.122035+08:00"
+        },
+        {
+          "lineNo": 1006,
+          "sourceKey": "knowledge-tree-v7:1:1.900007",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:35.123112+08:00"
+        },
+        {
+          "lineNo": 1007,
+          "sourceKey": "knowledge-tree-v7:1:1.900008",
+          "fieldPath": "unexpected_field",
+          "severity": "error",
+          "issueCode": "KP_UNKNOWN_FIELD",
+          "message": "出现未知字段unexpected_field",
+          "createTime": "2026-07-31T10:39:35.125114+08:00"
+        },
+        {
+          "lineNo": 1007,
+          "sourceKey": "knowledge-tree-v7:1:1.900008",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:35.126142+08:00"
+        },
+        {
+          "lineNo": 1008,
+          "sourceKey": "knowledge-tree-v7:1:1.900009",
+          "fieldPath": "id",
+          "severity": "error",
+          "issueCode": "KP_UNKNOWN_FIELD",
+          "message": "出现未知字段id",
+          "createTime": "2026-07-31T10:39:35.128775+08:00"
+        },
+        {
+          "lineNo": 1008,
+          "sourceKey": "knowledge-tree-v7:1:1.900009",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:35.130099+08:00"
+        },
+        {
+          "lineNo": 1009,
+          "sourceKey": null,
+          "fieldPath": "source_key",
+          "severity": "error",
+          "issueCode": "KP_SOURCE_KEY_INVALID",
+          "message": "来源键格式不正确",
+          "createTime": "2026-07-31T10:39:35.132531+08:00"
+        },
+        {
+          "lineNo": 1009,
+          "sourceKey": null,
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:35.133808+08:00"
+        },
+        {
+          "lineNo": 1010,
+          "sourceKey": null,
+          "fieldPath": "source_key",
+          "severity": "error",
+          "issueCode": "KP_SOURCE_KEY_INVALID",
+          "message": "来源键格式不正确",
+          "createTime": "2026-07-31T10:39:35.135696+08:00"
+        },
+        {
+          "lineNo": 1010,
+          "sourceKey": null,
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:35.136758+08:00"
+        },
+        {
+          "lineNo": 1011,
+          "sourceKey": null,
+          "fieldPath": "source_key",
+          "severity": "error",
+          "issueCode": "KP_SOURCE_KEY_INVALID",
+          "message": "来源键格式不正确",
+          "createTime": "2026-07-31T10:39:35.138651+08:00"
+        },
+        {
+          "lineNo": 1011,
+          "sourceKey": null,
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:35.13985+08:00"
+        },
+        {
+          "lineNo": 1012,
+          "sourceKey": null,
+          "fieldPath": "source_key",
+          "severity": "error",
+          "issueCode": "KP_SOURCE_KEY_INVALID",
+          "message": "来源键格式不正确",
+          "createTime": "2026-07-31T10:39:35.142025+08:00"
+        },
+        {
+          "lineNo": 1012,
+          "sourceKey": null,
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:35.143134+08:00"
+        },
+        {
+          "lineNo": 1013,
+          "sourceKey": null,
+          "fieldPath": "source_key",
+          "severity": "error",
+          "issueCode": "KP_SOURCE_KEY_INVALID",
+          "message": "来源键格式不正确",
+          "createTime": "2026-07-31T10:39:35.145346+08:00"
+        },
+        {
+          "lineNo": 1013,
+          "sourceKey": null,
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:35.146499+08:00"
+        },
+        {
+          "lineNo": 1014,
+          "sourceKey": null,
+          "fieldPath": "subject_no",
+          "severity": "error",
+          "issueCode": "KP_SUBJECT_NO_INVALID",
+          "message": "科目编号只允许1至3",
+          "createTime": "2026-07-31T10:39:35.148481+08:00"
+        },
+        {
+          "lineNo": 1014,
+          "sourceKey": null,
+          "fieldPath": "source_key",
+          "severity": "error",
+          "issueCode": "KP_SOURCE_KEY_INVALID",
+          "message": "来源键格式不正确",
+          "createTime": "2026-07-31T10:39:35.149622+08:00"
+        },
+        {
+          "lineNo": 1014,
+          "sourceKey": null,
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:35.150655+08:00"
+        },
+        {
+          "lineNo": 1015,
+          "sourceKey": null,
+          "fieldPath": "subject_no",
+          "severity": "error",
+          "issueCode": "KP_SUBJECT_NO_INVALID",
+          "message": "科目编号只允许1至3",
+          "createTime": "2026-07-31T10:39:35.152627+08:00"
+        },
+        {
+          "lineNo": 1015,
+          "sourceKey": null,
+          "fieldPath": "source_key",
+          "severity": "error",
+          "issueCode": "KP_SOURCE_KEY_INVALID",
+          "message": "来源键格式不正确",
+          "createTime": "2026-07-31T10:39:35.153876+08:00"
+        },
+        {
+          "lineNo": 1015,
+          "sourceKey": null,
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:35.155069+08:00"
+        },
+        {
+          "lineNo": 1016,
+          "sourceKey": null,
+          "fieldPath": "subject_no",
+          "severity": "error",
+          "issueCode": "KP_FIELD_TYPE_INVALID",
+          "message": "字段类型不正确",
+          "createTime": "2026-07-31T10:39:35.157432+08:00"
+        },
+        {
+          "lineNo": 1016,
+          "sourceKey": null,
+          "fieldPath": "source_key",
+          "severity": "error",
+          "issueCode": "KP_SOURCE_KEY_INVALID",
+          "message": "来源键格式不正确",
+          "createTime": "2026-07-31T10:39:35.158575+08:00"
+        },
+        {
+          "lineNo": 1017,
+          "sourceKey": "knowledge-tree-v7:2:2.900010",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:35.160498+08:00"
+        },
+        {
+          "lineNo": 1018,
+          "sourceKey": null,
+          "fieldPath": "syllabus_number",
+          "severity": "error",
+          "issueCode": "KP_SYLLABUS_NUMBER_INVALID",
+          "message": "大纲编号格式不正确",
+          "createTime": "2026-07-31T10:39:35.162847+08:00"
+        },
+        {
+          "lineNo": 1018,
+          "sourceKey": null,
+          "fieldPath": "source_key",
+          "severity": "error",
+          "issueCode": "KP_SOURCE_KEY_INVALID",
+          "message": "来源键格式不正确",
+          "createTime": "2026-07-31T10:39:35.163913+08:00"
+        },
+        {
+          "lineNo": 1018,
+          "sourceKey": null,
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:35.165003+08:00"
+        },
+        {
+          "lineNo": 1019,
+          "sourceKey": null,
+          "fieldPath": "syllabus_number",
+          "severity": "error",
+          "issueCode": "KP_SYLLABUS_NUMBER_INVALID",
+          "message": "大纲编号格式不正确",
+          "createTime": "2026-07-31T10:39:35.168351+08:00"
+        },
+        {
+          "lineNo": 1019,
+          "sourceKey": null,
+          "fieldPath": "source_key",
+          "severity": "error",
+          "issueCode": "KP_SOURCE_KEY_INVALID",
+          "message": "来源键格式不正确",
+          "createTime": "2026-07-31T10:39:35.169737+08:00"
+        },
+        {
+          "lineNo": 1019,
+          "sourceKey": null,
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:35.170928+08:00"
+        },
+        {
+          "lineNo": 1020,
+          "sourceKey": null,
+          "fieldPath": "syllabus_number",
+          "severity": "error",
+          "issueCode": "KP_SYLLABUS_NUMBER_INVALID",
+          "message": "大纲编号格式不正确",
+          "createTime": "2026-07-31T10:39:35.172964+08:00"
+        },
+        {
+          "lineNo": 1020,
+          "sourceKey": null,
+          "fieldPath": "source_key",
+          "severity": "error",
+          "issueCode": "KP_SOURCE_KEY_INVALID",
+          "message": "来源键格式不正确",
+          "createTime": "2026-07-31T10:39:35.174444+08:00"
+        },
+        {
+          "lineNo": 1020,
+          "sourceKey": null,
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:35.175631+08:00"
+        },
+        {
+          "lineNo": 1021,
+          "sourceKey": null,
+          "fieldPath": "syllabus_number",
+          "severity": "error",
+          "issueCode": "KP_SYLLABUS_NUMBER_INVALID",
+          "message": "大纲编号格式不正确",
+          "createTime": "2026-07-31T10:39:35.177634+08:00"
+        },
+        {
+          "lineNo": 1021,
+          "sourceKey": null,
+          "fieldPath": "source_key",
+          "severity": "error",
+          "issueCode": "KP_SOURCE_KEY_INVALID",
+          "message": "来源键格式不正确",
+          "createTime": "2026-07-31T10:39:35.178754+08:00"
+        },
+        {
+          "lineNo": 1021,
+          "sourceKey": null,
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:35.179897+08:00"
+        },
+        {
+          "lineNo": 1022,
+          "sourceKey": null,
+          "fieldPath": "syllabus_number",
+          "severity": "error",
+          "issueCode": "KP_SUBJECT_NUMBER_MISMATCH",
+          "message": "编号首段与科目不一致",
+          "createTime": "2026-07-31T10:39:35.18177+08:00"
+        },
+        {
+          "lineNo": 1022,
+          "sourceKey": null,
+          "fieldPath": "source_key",
+          "severity": "error",
+          "issueCode": "KP_SOURCE_KEY_INVALID",
+          "message": "来源键格式不正确",
+          "createTime": "2026-07-31T10:39:35.182847+08:00"
+        },
+        {
+          "lineNo": 1022,
+          "sourceKey": null,
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:35.183907+08:00"
+        },
+        {
+          "lineNo": 1023,
+          "sourceKey": null,
+          "fieldPath": "syllabus_number",
+          "severity": "error",
+          "issueCode": "KP_FIELD_VALUE_INVALID",
+          "message": "大纲编号长度不能超过100",
+          "createTime": "2026-07-31T10:39:35.185682+08:00"
+        },
+        {
+          "lineNo": 1023,
+          "sourceKey": null,
+          "fieldPath": "source_key",
+          "severity": "error",
+          "issueCode": "KP_SOURCE_KEY_INVALID",
+          "message": "来源键格式不正确",
+          "createTime": "2026-07-31T10:39:35.187003+08:00"
+        },
+        {
+          "lineNo": 1023,
+          "sourceKey": null,
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:35.188025+08:00"
+        },
+        {
+          "lineNo": 1024,
+          "sourceKey": null,
+          "fieldPath": "syllabus_number",
+          "severity": "error",
+          "issueCode": "KP_FIELD_TYPE_INVALID",
+          "message": "字段类型不正确",
+          "createTime": "2026-07-31T10:39:35.189954+08:00"
+        },
+        {
+          "lineNo": 1024,
+          "sourceKey": null,
+          "fieldPath": "source_key",
+          "severity": "error",
+          "issueCode": "KP_SOURCE_KEY_INVALID",
+          "message": "来源键格式不正确",
+          "createTime": "2026-07-31T10:39:35.191061+08:00"
+        },
+        {
+          "lineNo": 1024,
+          "sourceKey": null,
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:35.19223+08:00"
+        },
+        {
+          "lineNo": 1025,
+          "sourceKey": "knowledge-tree-v7:1:1.900026",
+          "fieldPath": "syllabus_title",
+          "severity": "error",
+          "issueCode": "KP_FIELD_VALUE_INVALID",
+          "message": "知识点标题长度必须为1至500",
+          "createTime": "2026-07-31T10:39:35.194189+08:00"
+        },
+        {
+          "lineNo": 1025,
+          "sourceKey": "knowledge-tree-v7:1:1.900026",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:35.19523+08:00"
+        },
+        {
+          "lineNo": 1026,
+          "sourceKey": "knowledge-tree-v7:1:1.900027",
+          "fieldPath": "syllabus_title",
+          "severity": "error",
+          "issueCode": "KP_FIELD_VALUE_INVALID",
+          "message": "知识点标题长度必须为1至500",
+          "createTime": "2026-07-31T10:39:35.197149+08:00"
+        },
+        {
+          "lineNo": 1026,
+          "sourceKey": "knowledge-tree-v7:1:1.900027",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:35.198127+08:00"
+        },
+        {
+          "lineNo": 1027,
+          "sourceKey": "knowledge-tree-v7:1:1.900028",
+          "fieldPath": "syllabus_title",
+          "severity": "error",
+          "issueCode": "KP_FIELD_VALUE_INVALID",
+          "message": "知识点标题长度必须为1至500",
+          "createTime": "2026-07-31T10:39:35.19998+08:00"
+        },
+        {
+          "lineNo": 1027,
+          "sourceKey": "knowledge-tree-v7:1:1.900028",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:35.201022+08:00"
+        },
+        {
+          "lineNo": 1028,
+          "sourceKey": "knowledge-tree-v7:1:1.900029",
+          "fieldPath": "syllabus_title",
+          "severity": "error",
+          "issueCode": "KP_FIELD_TYPE_INVALID",
+          "message": "字段类型不正确",
+          "createTime": "2026-07-31T10:39:35.202781+08:00"
+        },
+        {
+          "lineNo": 1028,
+          "sourceKey": "knowledge-tree-v7:1:1.900029",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:35.203853+08:00"
+        },
+        {
+          "lineNo": 1029,
+          "sourceKey": "knowledge-tree-v7:1:1.900030",
+          "fieldPath": "parent_syllabus_number",
+          "severity": "error",
+          "issueCode": "KP_FIELD_TYPE_INVALID",
+          "message": "字段类型不正确",
+          "createTime": "2026-07-31T10:39:35.20584+08:00"
+        },
+        {
+          "lineNo": 1029,
+          "sourceKey": "knowledge-tree-v7:1:1.900030",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:35.207165+08:00"
+        },
+        {
+          "lineNo": 1030,
+          "sourceKey": "knowledge-tree-v7:1:1.900031",
+          "fieldPath": "parent_syllabus_number",
+          "severity": "error",
+          "issueCode": "KP_SYLLABUS_NUMBER_INVALID",
+          "message": "父节点编号格式不正确",
+          "createTime": "2026-07-31T10:39:35.209371+08:00"
+        },
+        {
+          "lineNo": 1030,
+          "sourceKey": "knowledge-tree-v7:1:1.900031",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:35.210542+08:00"
+        },
+        {
+          "lineNo": 1031,
+          "sourceKey": "knowledge-tree-v7:1:1.900032",
+          "fieldPath": "parent_syllabus_number",
+          "severity": "error",
+          "issueCode": "KP_PARENT_NOT_FOUND",
+          "message": "父节点不存在",
+          "createTime": "2026-07-31T10:39:35.212355+08:00"
+        },
+        {
+          "lineNo": 1031,
+          "sourceKey": "knowledge-tree-v7:1:1.900032",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:35.213311+08:00"
+        },
+        {
+          "lineNo": 1032,
+          "sourceKey": "knowledge-tree-v7:1:1.900035",
+          "fieldPath": "parent_syllabus_number",
+          "severity": "error",
+          "issueCode": "KP_PARENT_ORDER_INVALID",
+          "message": "父节点必须早于子节点",
+          "createTime": "2026-07-31T10:39:35.215542+08:00"
+        },
+        {
+          "lineNo": 1032,
+          "sourceKey": "knowledge-tree-v7:1:1.900035",
+          "fieldPath": "parent_syllabus_number",
+          "severity": "error",
+          "issueCode": "KP_TREE_CYCLE",
+          "message": "该行形成循环引用",
+          "createTime": "2026-07-31T10:39:35.216504+08:00"
+        },
+        {
+          "lineNo": 1032,
+          "sourceKey": "knowledge-tree-v7:1:1.900035",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:35.217513+08:00"
+        },
+        {
+          "lineNo": 1033,
+          "sourceKey": "knowledge-tree-v7:1:1.900036",
+          "fieldPath": "tree_depth",
+          "severity": "error",
+          "issueCode": "KP_FIELD_VALUE_INVALID",
+          "message": "树层级必须为1至32767",
+          "createTime": "2026-07-31T10:39:35.21938+08:00"
+        },
+        {
+          "lineNo": 1033,
+          "sourceKey": "knowledge-tree-v7:1:1.900036",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:35.22065+08:00"
+        },
+        {
+          "lineNo": 1034,
+          "sourceKey": "knowledge-tree-v7:1:1.900037",
+          "fieldPath": "tree_depth",
+          "severity": "error",
+          "issueCode": "KP_FIELD_VALUE_INVALID",
+          "message": "树层级必须为1至32767",
+          "createTime": "2026-07-31T10:39:35.222837+08:00"
+        },
+        {
+          "lineNo": 1034,
+          "sourceKey": "knowledge-tree-v7:1:1.900037",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:35.223958+08:00"
+        },
+        {
+          "lineNo": 1035,
+          "sourceKey": "knowledge-tree-v7:1:1.900038",
+          "fieldPath": "tree_depth",
+          "severity": "error",
+          "issueCode": "KP_FIELD_VALUE_INVALID",
+          "message": "树层级必须为1至32767",
+          "createTime": "2026-07-31T10:39:35.225975+08:00"
+        },
+        {
+          "lineNo": 1035,
+          "sourceKey": "knowledge-tree-v7:1:1.900038",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:35.226888+08:00"
+        },
+        {
+          "lineNo": 1036,
+          "sourceKey": "knowledge-tree-v7:1:1.900039",
+          "fieldPath": "tree_depth",
+          "severity": "error",
+          "issueCode": "KP_FIELD_TYPE_INVALID",
+          "message": "字段类型不正确",
+          "createTime": "2026-07-31T10:39:35.229421+08:00"
+        },
+        {
+          "lineNo": 1036,
+          "sourceKey": "knowledge-tree-v7:1:1.900039",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:35.230592+08:00"
+        },
+        {
+          "lineNo": 1037,
+          "sourceKey": "knowledge-tree-v7:1:1.900040",
+          "fieldPath": "tree_depth",
+          "severity": "error",
+          "issueCode": "KP_TREE_DEPTH_INVALID",
+          "message": "根节点层级必须为1",
+          "createTime": "2026-07-31T10:39:35.232519+08:00"
+        },
+        {
+          "lineNo": 1037,
+          "sourceKey": "knowledge-tree-v7:1:1.900040",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:35.23354+08:00"
+        },
+        {
+          "lineNo": 1038,
+          "sourceKey": "knowledge-tree-v7:1:1.900041",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_FIELD_VALUE_INVALID",
+          "message": "同级排序必须从1开始",
+          "createTime": "2026-07-31T10:39:35.235277+08:00"
+        },
+        {
+          "lineNo": 1039,
+          "sourceKey": "knowledge-tree-v7:1:1.900042",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_FIELD_VALUE_INVALID",
+          "message": "同级排序必须从1开始",
+          "createTime": "2026-07-31T10:39:35.237226+08:00"
+        },
+        {
+          "lineNo": 1040,
+          "sourceKey": "knowledge-tree-v7:1:1.900043",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_FIELD_VALUE_INVALID",
+          "message": "整数超出32位有符号整数范围",
+          "createTime": "2026-07-31T10:39:35.239127+08:00"
+        },
+        {
+          "lineNo": 1041,
+          "sourceKey": "knowledge-tree-v7:1:1.900044",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_FIELD_TYPE_INVALID",
+          "message": "字段类型不正确",
+          "createTime": "2026-07-31T10:39:35.241154+08:00"
+        },
+        {
+          "lineNo": 1042,
+          "sourceKey": "knowledge-tree-v7:1:1.900045",
+          "fieldPath": "description",
+          "severity": "error",
+          "issueCode": "KP_FIELD_VALUE_INVALID",
+          "message": "说明不能使用空字符串",
+          "createTime": "2026-07-31T10:39:35.243104+08:00"
+        },
+        {
+          "lineNo": 1042,
+          "sourceKey": "knowledge-tree-v7:1:1.900045",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:35.244155+08:00"
+        },
+        {
+          "lineNo": 1043,
+          "sourceKey": "knowledge-tree-v7:1:1.900046",
+          "fieldPath": "description",
+          "severity": "error",
+          "issueCode": "KP_FIELD_TYPE_INVALID",
+          "message": "字段类型不正确",
+          "createTime": "2026-07-31T10:39:35.246111+08:00"
+        },
+        {
+          "lineNo": 1043,
+          "sourceKey": "knowledge-tree-v7:1:1.900046",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:35.247203+08:00"
+        },
+        {
+          "lineNo": 1044,
+          "sourceKey": "knowledge-tree-v7:1:1.900047",
+          "fieldPath": "importance",
+          "severity": "error",
+          "issueCode": "KP_FIELD_VALUE_INVALID",
+          "message": "重要度必须为null",
+          "createTime": "2026-07-31T10:39:35.248964+08:00"
+        },
+        {
+          "lineNo": 1044,
+          "sourceKey": "knowledge-tree-v7:1:1.900047",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:35.250174+08:00"
+        },
+        {
+          "lineNo": 1045,
+          "sourceKey": "knowledge-tree-v7:1:1.900048",
+          "fieldPath": "importance",
+          "severity": "error",
+          "issueCode": "KP_FIELD_VALUE_INVALID",
+          "message": "重要度必须为null",
+          "createTime": "2026-07-31T10:39:35.251992+08:00"
+        },
+        {
+          "lineNo": 1045,
+          "sourceKey": "knowledge-tree-v7:1:1.900048",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:35.253101+08:00"
+        },
+        {
+          "lineNo": 1046,
+          "sourceKey": "knowledge-tree-v7:1:1.900049",
+          "fieldPath": "diagnostic_enabled",
+          "severity": "error",
+          "issueCode": "KP_FIELD_VALUE_INVALID",
+          "message": "开关必须为false",
+          "createTime": "2026-07-31T10:39:35.255089+08:00"
+        },
+        {
+          "lineNo": 1046,
+          "sourceKey": "knowledge-tree-v7:1:1.900049",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:35.256119+08:00"
+        },
+        {
+          "lineNo": 1047,
+          "sourceKey": "knowledge-tree-v7:1:1.900050",
+          "fieldPath": "diagnostic_enabled",
+          "severity": "error",
+          "issueCode": "KP_FIELD_TYPE_INVALID",
+          "message": "字段类型不正确",
+          "createTime": "2026-07-31T10:39:35.258061+08:00"
+        },
+        {
+          "lineNo": 1047,
+          "sourceKey": "knowledge-tree-v7:1:1.900050",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:35.259226+08:00"
+        },
+        {
+          "lineNo": 1048,
+          "sourceKey": "knowledge-tree-v7:1:1.900051",
+          "fieldPath": "recommendation_enabled",
+          "severity": "error",
+          "issueCode": "KP_FIELD_VALUE_INVALID",
+          "message": "开关必须为false",
+          "createTime": "2026-07-31T10:39:35.2613+08:00"
+        },
+        {
+          "lineNo": 1048,
+          "sourceKey": "knowledge-tree-v7:1:1.900051",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:35.262348+08:00"
+        },
+        {
+          "lineNo": 1049,
+          "sourceKey": "knowledge-tree-v7:1:1.900052",
+          "fieldPath": "recommendation_enabled",
+          "severity": "error",
+          "issueCode": "KP_FIELD_TYPE_INVALID",
+          "message": "字段类型不正确",
+          "createTime": "2026-07-31T10:39:35.264255+08:00"
+        },
+        {
+          "lineNo": 1049,
+          "sourceKey": "knowledge-tree-v7:1:1.900052",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:35.265225+08:00"
+        },
+        {
+          "lineNo": 1050,
+          "sourceKey": "knowledge-tree-v7:1:1.900053",
+          "fieldPath": "status",
+          "severity": "error",
+          "issueCode": "KP_FIELD_VALUE_INVALID",
+          "message": "状态必须为0",
+          "createTime": "2026-07-31T10:39:35.267436+08:00"
+        },
+        {
+          "lineNo": 1050,
+          "sourceKey": "knowledge-tree-v7:1:1.900053",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:35.268428+08:00"
+        },
+        {
+          "lineNo": 1051,
+          "sourceKey": "knowledge-tree-v7:1:1.900054",
+          "fieldPath": "status",
+          "severity": "error",
+          "issueCode": "KP_FIELD_TYPE_INVALID",
+          "message": "字段类型不正确",
+          "createTime": "2026-07-31T10:39:35.270517+08:00"
+        },
+        {
+          "lineNo": 1051,
+          "sourceKey": "knowledge-tree-v7:1:1.900054",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:35.271594+08:00"
+        },
+        {
+          "lineNo": 1052,
+          "sourceKey": "knowledge-tree-v7:1:1.900055",
+          "fieldPath": "status",
+          "severity": "error",
+          "issueCode": "KP_FIELD_VALUE_INVALID",
+          "message": "状态必须为0",
+          "createTime": "2026-07-31T10:39:35.273566+08:00"
+        },
+        {
+          "lineNo": 1052,
+          "sourceKey": "knowledge-tree-v7:1:1.900055",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:35.274785+08:00"
+        },
+        {
+          "lineNo": 1053,
+          "sourceKey": "knowledge-tree-v7:1:1.900056",
+          "fieldPath": "source_key",
+          "severity": "error",
+          "issueCode": "KP_DUPLICATE_SOURCE_KEY",
+          "message": "来源键重复",
+          "createTime": "2026-07-31T10:39:35.276631+08:00"
+        },
+        {
+          "lineNo": 1053,
+          "sourceKey": "knowledge-tree-v7:1:1.900056",
+          "fieldPath": "syllabus_number",
+          "severity": "error",
+          "issueCode": "KP_DUPLICATE_SYLLABUS_NUMBER",
+          "message": "科目内大纲编号重复",
+          "createTime": "2026-07-31T10:39:35.277596+08:00"
+        },
+        {
+          "lineNo": 1053,
+          "sourceKey": "knowledge-tree-v7:1:1.900056",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:35.278646+08:00"
+        },
+        {
+          "lineNo": 1054,
+          "sourceKey": "knowledge-tree-v7:1:1.900056",
+          "fieldPath": "source_key",
+          "severity": "error",
+          "issueCode": "KP_DUPLICATE_SOURCE_KEY",
+          "message": "来源键重复",
+          "createTime": "2026-07-31T10:39:35.280485+08:00"
+        },
+        {
+          "lineNo": 1054,
+          "sourceKey": "knowledge-tree-v7:1:1.900056",
+          "fieldPath": "syllabus_number",
+          "severity": "error",
+          "issueCode": "KP_DUPLICATE_SYLLABUS_NUMBER",
+          "message": "科目内大纲编号重复",
+          "createTime": "2026-07-31T10:39:35.281536+08:00"
+        },
+        {
+          "lineNo": 1054,
+          "sourceKey": "knowledge-tree-v7:1:1.900056",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:35.282693+08:00"
+        },
+        {
+          "lineNo": 1055,
+          "sourceKey": "knowledge-tree-v7:1:1.900058",
+          "fieldPath": "parent_syllabus_number",
+          "severity": "error",
+          "issueCode": "KP_PARENT_ORDER_INVALID",
+          "message": "父节点必须早于子节点",
+          "createTime": "2026-07-31T10:39:35.284716+08:00"
+        },
+        {
+          "lineNo": 1055,
+          "sourceKey": "knowledge-tree-v7:1:1.900058",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:35.285829+08:00"
+        },
+        {
+          "lineNo": 1056,
+          "sourceKey": "knowledge-tree-v7:1:1.990001",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:35.287753+08:00"
+        },
+        {
+          "lineNo": 1057,
+          "sourceKey": "knowledge-tree-v7:1:1.990002",
+          "fieldPath": "syllabus_title",
+          "severity": "error",
+          "issueCode": "KP_FIELD_VALUE_INVALID",
+          "message": "知识点标题长度必须为1至500",
+          "createTime": "2026-07-31T10:39:35.289462+08:00"
+        },
+        {
+          "lineNo": 1057,
+          "sourceKey": "knowledge-tree-v7:1:1.990002",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:35.2904+08:00"
+        },
+        {
+          "lineNo": 1058,
+          "sourceKey": "knowledge-tree-v7:1:1.900061",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:35.29236+08:00"
+        },
+        {
+          "lineNo": 1059,
+          "sourceKey": "knowledge-tree-v7:1:1.990003",
+          "fieldPath": "parent_syllabus_number",
+          "severity": "error",
+          "issueCode": "KP_PARENT_ORDER_INVALID",
+          "message": "父节点必须早于子节点",
+          "createTime": "2026-07-31T10:39:35.294153+08:00"
+        },
+        {
+          "lineNo": 1059,
+          "sourceKey": "knowledge-tree-v7:1:1.990003",
+          "fieldPath": "parent_syllabus_number",
+          "severity": "error",
+          "issueCode": "KP_TREE_CYCLE",
+          "message": "该行形成循环引用",
+          "createTime": "2026-07-31T10:39:35.295281+08:00"
+        },
+        {
+          "lineNo": 1059,
+          "sourceKey": "knowledge-tree-v7:1:1.990003",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:35.29636+08:00"
+        },
+        {
+          "lineNo": 1060,
+          "sourceKey": "knowledge-tree-v7:1:1.990004",
+          "fieldPath": "parent_syllabus_number",
+          "severity": "error",
+          "issueCode": "KP_TREE_CYCLE",
+          "message": "该行形成循环引用",
+          "createTime": "2026-07-31T10:39:35.298402+08:00"
+        },
+        {
+          "lineNo": 1060,
+          "sourceKey": "knowledge-tree-v7:1:1.990004",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:35.299594+08:00"
+        },
+        {
+          "lineNo": 1061,
+          "sourceKey": null,
+          "fieldPath": "$line[1061]",
+          "severity": "error",
+          "issueCode": "KP_JSON_INVALID",
+          "message": "第1061行不是合法JSON对象",
+          "createTime": "2026-07-31T10:39:33.982513+08:00"
+        },
+        {
+          "lineNo": 1062,
+          "sourceKey": null,
+          "fieldPath": "$line[1062]",
+          "severity": "error",
+          "issueCode": "KP_JSON_INVALID",
+          "message": "第1062行不是合法JSON对象",
+          "createTime": "2026-07-31T10:39:33.984151+08:00"
+        },
+        {
+          "lineNo": 1063,
+          "sourceKey": null,
+          "fieldPath": "$line[1063]",
+          "severity": "error",
+          "issueCode": "KP_JSON_INVALID",
+          "message": "第1063行不是合法JSON对象",
+          "createTime": "2026-07-31T10:39:33.985545+08:00"
+        },
+        {
+          "lineNo": 1064,
+          "sourceKey": null,
+          "fieldPath": "$line[1064]",
+          "severity": "error",
+          "issueCode": "KP_JSON_INVALID",
+          "message": "第1064行不是合法JSON对象",
+          "createTime": "2026-07-31T10:39:33.987111+08:00"
+        },
+        {
+          "lineNo": 1065,
+          "sourceKey": null,
+          "fieldPath": "$line[1065]",
+          "severity": "error",
+          "issueCode": "KP_JSON_INVALID",
+          "message": "第1065行不是合法JSON对象",
+          "createTime": "2026-07-31T10:39:33.988714+08:00"
+        },
+        {
+          "lineNo": 1066,
+          "sourceKey": null,
+          "fieldPath": "$line[1066]",
+          "severity": "error",
+          "issueCode": "KP_JSON_INVALID",
+          "message": "第1066行不是合法JSON对象",
+          "createTime": "2026-07-31T10:39:33.990008+08:00"
+        },
+        {
+          "lineNo": 1067,
+          "sourceKey": null,
+          "fieldPath": "$line[1067]",
+          "severity": "error",
+          "issueCode": "KP_JSON_INVALID",
+          "message": "第1067行不是合法JSON对象",
+          "createTime": "2026-07-31T10:39:33.991522+08:00"
+        },
+        {
+          "lineNo": 1068,
+          "sourceKey": null,
+          "fieldPath": "$line[1068]",
+          "severity": "error",
+          "issueCode": "KP_JSON_DUPLICATE_KEY",
+          "message": "第1068行不是合法JSON对象",
+          "createTime": "2026-07-31T10:39:33.993644+08:00"
+        },
+        {
+          "lineNo": 1069,
+          "sourceKey": null,
+          "fieldPath": "$line[1069]",
+          "severity": "error",
+          "issueCode": "KP_JSON_LINE_TOO_LARGE",
+          "message": "第1069行超过单行大小限制",
+          "createTime": "2026-07-31T10:39:34.014832+08:00"
+        }
+      ]
+    },
+    "mappingUnknown": {
+      "id": "2083019715886686208",
+      "progress": {
+        "id": "2083019715886686208",
+        "status": "waiting_confirm",
+        "currentStage": "finalize_counts",
+        "progressPercent": "100.00",
+        "totalCount": 1,
+        "validCount": 0,
+        "warningCount": 0,
+        "failedCount": 1,
+        "startedTime": "2026-07-31T10:39:35.589584+08:00",
+        "finishedTime": "2026-07-31T10:39:36.329642+08:00",
+        "failureTraceId": null
+      },
+      "issues": [
+        {
+          "lineNo": 1,
+          "sourceKey": "knowledge-tree-v7:2:2.900010",
+          "fieldPath": "subject_no",
+          "severity": "error",
+          "issueCode": "KP_SUBJECT_MAPPING_UNKNOWN",
+          "message": "科目编号没有显式映射",
+          "createTime": "2026-07-31T10:39:36.325935+08:00"
+        },
+        {
+          "lineNo": 1,
+          "sourceKey": "knowledge-tree-v7:2:2.900010",
+          "fieldPath": "sort_order",
+          "severity": "error",
+          "issueCode": "KP_SORT_ORDER_INVALID",
+          "message": "同级排序重复或不连续",
+          "createTime": "2026-07-31T10:39:36.327+08:00"
+        }
+      ]
+    }
+  },
+  "context": {
+    "syllabus": {
+      "id": "900000000000000021",
+      "label": "系统架构设计师 · 第二版",
+      "knowledgeTreeAvailable": false,
+      "knowledgePointCount": 0
+    },
+    "subjects": [
+      {
+        "id": "900000000000000012",
+        "subjectNo": 1,
+        "label": "案例分析"
+      },
+      {
+        "id": "900000000000000011",
+        "subjectNo": 2,
+        "label": "综合知识"
+      },
+      {
+        "id": "900000000000000013",
+        "subjectNo": 3,
+        "label": "论文"
+      }
+    ]
+  },
+  "database": {
+    "beforeKnowledgeCount": 0
+  },
+  "upload_knowledge-point-v7-valid-crlf.jsonl": {
+    "status": 200,
+    "body": {
+      "code": 200,
+      "data": {
+        "id": "2083019720521392128",
+        "importType": "knowledge_point",
+        "syllabusVersionId": "900000000000000021",
+        "templateVersion": "knowledge_point/1.0",
+        "status": "uploaded",
+        "reused": false,
+        "createTime": "2026-07-31T10:39:36.68339412+08:00"
+      },
+      "msg": "操作成功"
+    }
+  },
+  "upload_knowledge-point-v7-valid-no-final-newline.jsonl": {
+    "status": 200,
+    "body": {
+      "code": 200,
+      "data": {
+        "id": "2083019720672387072",
+        "importType": "knowledge_point",
+        "syllabusVersionId": "900000000000000021",
+        "templateVersion": "knowledge_point/1.0",
+        "status": "uploaded",
+        "reused": false,
+        "createTime": "2026-07-31T10:39:36.719709023+08:00"
+      },
+      "msg": "操作成功"
+    }
+  },
+  "upload_knowledge-point-v7-valid-with-bom.jsonl": {
+    "status": 400,
+    "body": {
+      "code": 400,
+      "data": {
+        "errorCode": "IMPORT_FILE_INVALID",
+        "retryable": false,
+        "traceId": null,
+        "fieldErrors": []
+      },
+      "msg": "文件不能包含UTF-8 BOM"
+    }
+  },
+  "upload_knowledge-point-invalid-utf8.jsonl": {
+    "status": 400,
+    "body": {
+      "code": 400,
+      "data": {
+        "errorCode": "IMPORT_FILE_INVALID",
+        "retryable": false,
+        "traceId": null,
+        "fieldErrors": []
+      },
+      "msg": "文件不是合法UTF-8"
+    }
+  },
+  "finishedAt": "2026-07-31T02:39:36.754Z",
+  "passed": true
+}

@@ -1,0 +1,4 @@
+services:
+  backend:
+    environment:
+      CAPTCHA_ENABLE: "false"

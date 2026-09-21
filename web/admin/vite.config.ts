@@ -3,24 +3,6 @@ import { fileURLToPath, URL } from 'node:url';
 import createPlugins from './vite/plugins';
 import autoprefixer from 'autoprefixer'; // css自动添加兼容性前缀
 
-const vendorChunk = (id: string) => {
-  const normalizedId = id.replaceAll('\\', '/');
-  if (!normalizedId.includes('/node_modules/')) return undefined;
-  if (/(?:^|\/)(?:@vue\/|vue\/|vue-router\/|pinia\/|@vueuse\/)/.test(normalizedId)) return 'framework';
-  if (normalizedId.includes('/element-plus/') || normalizedId.includes('/@element-plus/')) return 'element-plus';
-  if (normalizedId.includes('/echarts/') || normalizedId.includes('/zrender/')) return 'charts';
-  if (normalizedId.includes('/pdfjs-dist/')) return 'pdf';
-  if (
-    normalizedId.includes('/@wangeditor-next/') ||
-    normalizedId.includes('/katex/') ||
-    normalizedId.includes('/highlight.js/')
-  ) {
-    return 'editor';
-  }
-  if (normalizedId.includes('/vxe-table/') || normalizedId.includes('/vxe-pc-ui/')) return 'data-grid';
-  return 'vendor';
-};
-
 export default defineConfig(({ mode, command }) => {
   const env = loadEnv(mode, process.cwd());
   const importMockAliases = env.VITE_APP_IMPORT_MOCK === 'true'
@@ -50,9 +32,6 @@ export default defineConfig(({ mode, command }) => {
     build: {
       chunkSizeWarningLimit: 1500,
       rolldownOptions: {
-        output: {
-          manualChunks: vendorChunk
-        },
         checks: {
           invalidAnnotation: false,
           pluginTimings: false

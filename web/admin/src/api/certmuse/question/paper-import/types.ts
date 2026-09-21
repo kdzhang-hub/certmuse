@@ -4,10 +4,7 @@ import type { CollectionType } from '../collection/types';
 export type PaperImportIssueSeverity = 'error' | 'warning';
 
 export interface PaperImportCreateForm {
-  /** Original single-ZIP upload, retained for callers outside the folder picker. */
-  file?: File;
-  /** ZIP files selected from one paper folder. */
-  files?: File[];
+  file: File;
   collectionName: string;
   collectionType: CollectionType;
   durationMinutes: number;

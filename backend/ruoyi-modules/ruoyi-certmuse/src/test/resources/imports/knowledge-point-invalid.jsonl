@@ -1,0 +1,5 @@
+{"schema_version":"1.0","source_key":"demo:1:1.1","subject_no":1,"syllabus_number":"1.1","syllabus_title":"架构基础","parent_syllabus_number":null,"tree_depth":1,"sort_order":1,"description":null,"importance":null,"diagnostic_enabled":false,"recommendation_enabled":false,"status":"0"}
+{"schema_version":"1.0","source_key":"demo:4:4.1","subject_no":4,"syllabus_number":"4.1","syllabus_title":"未知科目","parent_syllabus_number":null,"tree_depth":1,"sort_order":1,"description":null,"importance":null,"diagnostic_enabled":false,"recommendation_enabled":false,"status":"0"}
+{"schema_version":"1.0","source_key":"demo:1:1.1","subject_no":1,"syllabus_number":"1.1","syllabus_title":"重复编号","parent_syllabus_number":null,"tree_depth":1,"sort_order":2,"description":null,"importance":null,"diagnostic_enabled":false,"recommendation_enabled":false,"status":"0"}
+{"schema_version":"1.0","source_key":"demo:1:1.2.1","subject_no":1,"syllabus_number":"1.2.1","syllabus_title":"缺失父节点","parent_syllabus_number":"1.2","tree_depth":2,"sort_order":1,"description":null,"importance":null,"diagnostic_enabled":false,"recommendation_enabled":false,"status":"0"}
+{not valid json}

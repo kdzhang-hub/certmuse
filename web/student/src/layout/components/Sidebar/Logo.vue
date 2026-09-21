@@ -32,8 +32,9 @@ defineProps({
 
 const title = import.meta.env.VITE_APP_LOGO_TITLE;
 const settingsStore = useSettingsStore();
+const sideTheme = computed(() => settingsStore.sideTheme);
 const isTopNav = computed(() => settingsStore.navType === NavTypeEnum.TOP);
-const isDarkSide = computed(() => !isTopNav.value && settingsStore.dark);
+const isDarkSide = computed(() => !isTopNav.value && sideTheme.value === 'theme-dark');
 const logoSurface = computed(() => (isDarkSide.value ? 'rgba(255, 255, 255, 0.04)' : '#f8fafc'));
 const logoBorder = computed(() => (isDarkSide.value ? 'rgba(148, 163, 184, 0.12)' : '#e5e7eb'));
 const logoTextColor = computed(() => (isDarkSide.value ? '#f8fbff' : 'var(--app-text-title)'));

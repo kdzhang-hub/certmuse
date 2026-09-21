@@ -124,41 +124,6 @@ export interface CompleteKnowledgePracticeVo {
   returnPath: '/learning/question-bank/knowledge-practice';
 }
 
-export type ReinforcementStatus = 'PREPARING' | 'READY' | 'UNAVAILABLE' | 'DISMISSED' | 'STARTED' | 'COMPLETED';
-export interface ReinforcementSuggestionVo {
-  roundId: string;
-  status: ReinforcementStatus;
-  knowledgePoints: Array<{ id: string; name: string }>;
-  recommendationReason: string | null;
-  reasonSource: 'AGENT' | 'RULE' | null;
-  estimatedCount: number;
-  reinforcementSessionId: string | null;
-  answerPath: string | null;
-  availableActions: Array<'START' | 'DISMISS' | 'ENTER' | 'VIEW_RESULT'>;
-}
-export interface ReinforcementRoundVo {
-  roundId: string;
-  roundNo: number;
-  status: ReinforcementStatus;
-  actualCount: number;
-  reinforcementSessionId: string | null;
-  answerPath: string | null;
-  sourceSessionId: string;
-  sourceQuestionOrder: number;
-}
-export interface ReinforcementResultVo {
-  roundId: string;
-  roundNo: number;
-  correctCount: number;
-  actualCount: number;
-  correctRate: number;
-  items: Array<{ questionOrder: number; correct: boolean }>;
-  knowledgePoints: Array<{ id: string; name: string }>;
-  hasMoreCandidates: boolean;
-  continueAction: 'CONTINUE_REINFORCEMENT' | 'NO_MORE_QUESTIONS';
-  returnPath: string;
-}
-
 export const getKnowledgePracticeSetup = (): AxiosPromise<KnowledgePracticeSetupVo> => {
   return request({ url: '/api/assessment/knowledge-practices/setup', method: 'get' });
 };
@@ -212,42 +177,3 @@ export const completeKnowledgePractice = (
     headers: { 'X-Request-Id': requestId, repeatSubmit: false }
   });
 };
-
-export const getReinforcementSuggestion = (
-  sessionId: string,
-  questionOrder: number
-): AxiosPromise<ReinforcementSuggestionVo> =>
-  request({
-    url: `/api/assessment/knowledge-practices/${sessionId}/items/${questionOrder}/reinforcement`,
-    method: 'get'
-  });
-
-export const dismissReinforcement = (sessionId: string, questionOrder: number): AxiosPromise<void> =>
-  request({
-    url: `/api/assessment/knowledge-practices/${sessionId}/items/${questionOrder}/reinforcement/dismiss`,
-    method: 'post'
-  });
-
-export const createReinforcementRound = (
-  sessionId: string,
-  questionOrder: number,
-  requestId: string
-): AxiosPromise<ReinforcementRoundVo> =>
-  request({
-    url: `/api/assessment/knowledge-practices/${sessionId}/items/${questionOrder}/reinforcement/rounds`,
-    method: 'post',
-    headers: { 'X-Request-Id': requestId, repeatSubmit: false }
-  });
-
-export const getReinforcementRound = (roundId: string): AxiosPromise<ReinforcementRoundVo> =>
-  request({ url: `/api/assessment/reinforcement-rounds/${roundId}`, method: 'get' });
-
-export const continueReinforcementRound = (roundId: string, requestId: string): AxiosPromise<ReinforcementRoundVo> =>
-  request({
-    url: `/api/assessment/reinforcement-rounds/${roundId}/continue`,
-    method: 'post',
-    headers: { 'X-Request-Id': requestId, repeatSubmit: false }
-  });
-
-export const getReinforcementResult = (roundId: string): AxiosPromise<ReinforcementResultVo> =>
-  request({ url: `/api/assessment/reinforcement-rounds/${roundId}/result`, method: 'get' });

@@ -8,15 +8,6 @@ export type AiMessageRole = 'USER' | 'ASSISTANT';
 export type AiMessageStatus = 'COMPLETED' | 'GENERATING' | 'FAILED' | 'CANCELLED';
 export type AnswerDisclosureMode = 'GUIDANCE_ONLY' | 'FULL_EXPLANATION';
 
-export interface AiCitation {
-  textbookId: string;
-  textbookTitle: string;
-  edition: string | null;
-  headingPath: string[];
-  pageStart: number | null;
-  pageEnd: number | null;
-}
-
 export interface AiChatErrorVo {
   errorCode: string;
   retryable: boolean;
@@ -40,7 +31,6 @@ export interface AiChatMessageVo {
   errorCode: string | null;
   createdAt: string;
   completedAt: string | null;
-  citations?: AiCitation[];
 }
 
 export interface AiConversationVo {
@@ -79,35 +69,16 @@ export interface CancelAiMessageVo {
 export type AiStreamEvent =
   | {
       event: 'message.start';
-      data: {
-        conversationId: string;
-        userMessageId: string;
-        assistantMessageId: string;
-        answerDisclosureMode: AnswerDisclosureMode;
-      };
+      data: { conversationId: string; userMessageId: string; assistantMessageId: string; answerDisclosureMode: AnswerDisclosureMode };
     }
   | { event: 'message.delta'; data: { assistantMessageId: string; delta: string } }
   | {
       event: 'message.completed';
-      data: {
-        assistantMessageId: string;
-        status: 'COMPLETED';
-        finishReason: 'STOP' | 'LENGTH' | 'CONTENT_FILTER';
-        contentLength: number;
-        completedAt: string;
-        citations?: AiCitation[];
-      };
+      data: { assistantMessageId: string; status: 'COMPLETED'; finishReason: 'STOP' | 'LENGTH' | 'CONTENT_FILTER'; contentLength: number; completedAt: string };
     }
   | {
       event: 'message.failed';
-      data: {
-        assistantMessageId: string;
-        status: 'FAILED';
-        errorCode: string;
-        retryable: boolean;
-        traceId: string;
-        partialContentDiscarded: boolean;
-      };
+      data: { assistantMessageId: string; status: 'FAILED'; errorCode: string; retryable: boolean; traceId: string; partialContentDiscarded: boolean };
     }
   | { event: 'message.cancelled'; data: { assistantMessageId: string; status: 'CANCELLED'; completedAt: string } };
 
@@ -176,11 +147,7 @@ export async function streamAiMessage(
   if (!response.ok || !contentType.includes('text/event-stream')) {
     const body = await readJson(response);
     const error = body?.data as AiChatErrorVo | undefined;
-    throw new AiChatHttpError(
-      error?.errorCode || body?.msg || `AI 对话请求失败（${response.status}）`,
-      response.status,
-      error
-    );
+    throw new AiChatHttpError(error?.errorCode || body?.msg || `AI 对话请求失败（${response.status}）`, response.status, error);
   }
   if (!response.body) throw new AiChatHttpError('AI 对话流未返回内容。', response.status);
 
@@ -202,10 +169,7 @@ export async function streamAiMessage(
   }
 }
 
-async function fetchAiJson<T>(
-  path: string,
-  options: { method: 'POST'; requestId: string }
-): Promise<RuoYiAjaxResult<T>> {
+async function fetchAiJson<T>(path: string, options: { method: 'POST'; requestId: string }): Promise<RuoYiAjaxResult<T>> {
   const response = await fetch(apiUrl(path), {
     method: options.method,
     headers: aiHeaders(options.requestId, 'application/json')
@@ -213,11 +177,7 @@ async function fetchAiJson<T>(
   const body = await readJson(response);
   if (!response.ok) {
     const error = body?.data as AiChatErrorVo | undefined;
-    throw new AiChatHttpError(
-      error?.errorCode || body?.msg || `AI 对话请求失败（${response.status}）`,
-      response.status,
-      error
-    );
+    throw new AiChatHttpError(error?.errorCode || body?.msg || `AI 对话请求失败（${response.status}）`, response.status, error);
   }
   return (body ?? {}) as RuoYiAjaxResult<T>;
 }
@@ -239,17 +199,13 @@ function apiUrl(path: string) {
 function dispatchSseChunk(chunk: string, onEvent: (event: AiStreamEvent) => void) {
   const lines = chunk.split(/\r?\n/);
   if (lines.every(line => !line || line.startsWith(':'))) return;
-  const event = lines
-    .find(line => line.startsWith('event:'))
-    ?.slice('event:'.length)
-    .trim();
+  const event = lines.find(line => line.startsWith('event:'))?.slice('event:'.length).trim();
   const data = lines
     .filter(line => line.startsWith('data:'))
     .map(line => line.slice('data:'.length).trimStart())
     .join('\n');
   if (!event || !data) return;
-  if (!['message.start', 'message.delta', 'message.completed', 'message.failed', 'message.cancelled'].includes(event))
-    return;
+  if (!['message.start', 'message.delta', 'message.completed', 'message.failed', 'message.cancelled'].includes(event)) return;
   onEvent({ event, data: JSON.parse(data) } as AiStreamEvent);
 }
 

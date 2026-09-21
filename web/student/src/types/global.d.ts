@@ -124,10 +124,6 @@ declare global {
      */
     sideTheme: string;
     /**
-     * 全局深色模式。公共首页和学习端共用同一个持久化值。
-     */
-    dark: boolean;
-    /**
      * 主题模式
      */
     theme: string;

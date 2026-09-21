@@ -21,7 +21,6 @@ import org.dromara.certmuse.catalog.domain.vo.TextbookListVo;
 import org.dromara.certmuse.catalog.domain.vo.TextbookOptionsVo;
 import org.dromara.certmuse.catalog.mapper.TextbookMapper;
 import org.dromara.certmuse.catalog.service.TextbookService;
-import org.dromara.certmuse.catalog.service.TextbookEvidenceService;
 import org.dromara.certmuse.catalog.support.TextbookException;
 import org.dromara.common.core.domain.PageResult;
 import org.dromara.common.satoken.utils.LoginHelper;
@@ -39,7 +38,6 @@ public class TextbookServiceImpl implements TextbookService {
         new StatusOptionVo("published", "已发布"), new StatusOptionVo("offline", "已下架"));
     private static final List<String> STATUSES = STATUS_OPTIONS.stream().map(StatusOptionVo::value).toList();
     private final TextbookMapper mapper;
-    private final TextbookEvidenceService evidenceService;
     private final JsonMapper jsonMapper;
 
     public PageResult<TextbookListVo> list(TextbookQueryBo query) {
@@ -93,7 +91,6 @@ public class TextbookServiceImpl implements TextbookService {
         if (mapper.publishTextbook(documentId, LoginHelper.getUserId()) != 1) {
             throw new TextbookException(409, "TEXTBOOK_PUBLISH_FORBIDDEN", "教材状态已变更，请刷新后重试");
         }
-        evidenceService.queueDocument(documentId);
     }
 
     @Transactional
@@ -182,7 +179,6 @@ public class TextbookServiceImpl implements TextbookService {
                     .toList());
             }
         }
-        evidenceService.queueChunk(parsedChunkId);
         return detailChunk(mapper.selectChunk(documentId, parsedChunkId));
     }
 

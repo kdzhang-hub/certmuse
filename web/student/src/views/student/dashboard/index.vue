@@ -154,7 +154,7 @@ async function loadCurrentGoal() {
 async function loadOverview() {
   loading.value = true;
   const [taskResult, scoreResult, mistakeResult] = await Promise.allSettled([
-    listLearningTaskPool({ pageNum: 1, pageSize: 4 }),
+    listLearningTaskPool({ pageNum: 1, pageSize: 20 }),
     getOverallScore(),
     listMistakeReviews({ pageNum: 1, pageSize: 1, status: 'PENDING_CORRECTION' })
   ]);

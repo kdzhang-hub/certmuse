@@ -1,0 +1,22 @@
+[Unit]
+Description=CertMuse application
+After=network.target postgresql.service redis-server.service
+
+[Service]
+Type=simple
+User=certmuse
+Group=certmuse
+WorkingDirectory=/app/certmuse/backend
+EnvironmentFile=/etc/certmuse/runtime.env
+# The migration runner validates every applied SQL checksum before Java starts.
+# The + prefix keeps this pre-start hook privileged while Java runs as certmuse.
+ExecStartPre=+/app/certmuse/backend/certmuse-migrate-postgres.sh
+ExecStart=/usr/bin/java $JAVA_OPTS -jar /app/certmuse/backend/certmuse-admin.jar
+SuccessExitStatus=143
+Restart=on-failure
+RestartSec=5
+StandardOutput=append:/app/certmuse/logs/application.log
+StandardError=append:/app/certmuse/logs/application-error.log
+
+[Install]
+WantedBy=multi-user.target

@@ -12,8 +12,6 @@ import org.dromara.certmuse.assessment.domain.vo.KnowledgePracticeSetupVo;
 import org.dromara.certmuse.assessment.domain.vo.KnowledgePracticeSessionVo;
 import org.dromara.certmuse.assessment.domain.vo.KnowledgePracticeItemVo;
 import org.dromara.certmuse.assessment.domain.vo.StartKnowledgePracticeVo;
-import org.dromara.certmuse.assessment.domain.vo.ReinforcementSuggestionVo;
-import org.dromara.certmuse.assessment.domain.vo.ReinforcementRoundVo;
 import org.dromara.certmuse.assessment.service.KnowledgePracticeService;
 import org.dromara.common.core.domain.R;
 import org.dromara.common.satoken.utils.LoginHelper;
@@ -73,27 +71,4 @@ public class KnowledgePracticeController {
                                                    @RequestHeader("X-Request-Id") String requestId) {
         return R.ok(service.complete(LoginHelper.getUserId(), sessionId, requestId));
     }
-
-    @GetMapping("/{sessionId}/items/{questionOrder}/reinforcement")
-    @SaCheckPermission(value = {"certmuse:student", "certmuse:assessment:knowledge-practice:answer"}, mode = SaMode.AND)
-    public R<ReinforcementSuggestionVo> reinforcement(@PathVariable long sessionId,
-                                                       @PathVariable int questionOrder) {
-        return R.ok(service.reinforcement(LoginHelper.getUserId(), sessionId, questionOrder));
-    }
-
-    @PostMapping("/{sessionId}/items/{questionOrder}/reinforcement/dismiss")
-    @SaCheckPermission(value = {"certmuse:student", "certmuse:assessment:knowledge-practice:answer"}, mode = SaMode.AND)
-    public R<Void> dismissReinforcement(@PathVariable long sessionId, @PathVariable int questionOrder) {
-        service.dismissReinforcement(LoginHelper.getUserId(), sessionId, questionOrder);
-        return R.ok();
-    }
-
-    @PostMapping("/{sessionId}/items/{questionOrder}/reinforcement/rounds")
-    @SaCheckPermission(value = {"certmuse:student", "certmuse:assessment:knowledge-practice:answer"}, mode = SaMode.AND)
-    public R<ReinforcementRoundVo> createReinforcement(@PathVariable long sessionId,
-                                                        @PathVariable int questionOrder,
-                                                        @RequestHeader("X-Request-Id") String requestId) {
-        return R.ok(service.createReinforcement(LoginHelper.getUserId(), sessionId, questionOrder, requestId));
-    }
-
 }

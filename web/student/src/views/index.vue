@@ -2,10 +2,17 @@
   <div class="home">
     <section class="hero-panel">
       <div class="hero-copy">
-        <h1>CertMuse 学习中心</h1>
+        <h1>RuoYi-Vue-Plus 控制台</h1>
         <p>
-          从学习目标、诊断评估到练习复盘，围绕认证准备建立连贯、可追踪的学习旅程。
+          企业级后台管理系统 重写 RuoYi-Vue 所有功能 集成 Sa-Token、Mybatis-Plus、WarmFlow、SpringDoc、Hutool、OSS
+          等组件
         </p>
+        <div class="hero-actions">
+          <el-button type="primary" @click="goTarget('https://gitee.com/dromara/RuoYi-Vue-Plus')">查看源码</el-button>
+          <el-button plain @click="goTarget('https://plus-doc.dromara.org/#/ruoyi-vue-plus/changlog')">
+            更新日志
+          </el-button>
+        </div>
       </div>
     </section>
 
@@ -13,7 +20,7 @@
       <section class="section-card">
         <div class="section-head">
           <div>
-            <h2>学习路径</h2>
+            <h2>项目矩阵</h2>
           </div>
         </div>
         <div class="product-list">
@@ -27,6 +34,12 @@
             </div>
             <div class="product-tags">
               <el-tag v-for="tag in product.tags" :key="tag" effect="plain">{{ tag }}</el-tag>
+            </div>
+            <div class="product-actions">
+              <el-button type="primary" plain @click="goTarget(product.primaryUrl)">
+                {{ product.primaryLabel }}
+              </el-button>
+              <el-button plain @click="goTarget(product.secondaryUrl)">{{ product.secondaryLabel }}</el-button>
             </div>
           </article>
         </div>
@@ -54,34 +67,45 @@
 <script setup name="Index" lang="ts">
 const products = [
   {
-    name: '目标与诊断',
+    name: 'RuoYi-Vue-Plus',
     version: 'v6.0.0',
-    summary: '明确学习目标，完成诊断评估，找到下一步最值得投入的知识点。',
-    tags: ['目标', '诊断', '建议'],
+    summary: '面向分布式集群场景的后台管理系统，保持现有业务接口与权限逻辑，适合先完成前端壳升级。',
+    tags: ['Vue 3', 'Element Plus', 'Spring Boot', 'Sa-Token'],
+    primaryLabel: '访问 GitHub',
+    primaryUrl: 'https://github.com/dromara/RuoYi-Vue-Plus',
+    secondaryLabel: '查看更新日志',
+    secondaryUrl: 'https://plus-doc.dromara.org/#/ruoyi-vue-plus/changlog'
   },
   {
-    name: '练习与复盘',
+    name: 'RuoYi-Cloud-Plus',
     version: 'v6.0.0',
-    summary: '围绕练习、错题与学习任务形成反馈闭环，让进步更有迹可循。',
-    tags: ['练习', '错题', '进度'],
+    summary: '微服务通用权限管理系统，适合更复杂的服务治理场景，也可以沿用同样的前端升级思路。',
+    tags: ['Spring Cloud', 'Gateway', 'Nacos', 'Dubbo'],
+    primaryLabel: '访问 GitHub',
+    primaryUrl: 'https://github.com/dromara/RuoYi-Cloud-Plus',
+    secondaryLabel: '查看更新日志',
+    secondaryUrl: 'https://plus-doc.dromara.org/#/ruoyi-cloud-plus/changlog'
   }
 ];
 
 const capabilityGroups = [
   {
-    title: '认证准备',
-    items: ['学习目标与入门引导', '章节学习与资源浏览', '诊断与薄弱项识别']
+    title: '后端基建',
+    items: ['Spring Boot / Spring Cloud', 'Sa-Token 认证与权限', 'MySQL / Redis', '代码生成器']
   },
   {
-    title: '持续练习',
-    items: ['题目练习与即时反馈', '错题整理与重点回看', '任务提醒与学习记录']
+    title: '平台能力',
+    items: ['动态菜单与按钮权限', '监控、日志、在线用户', '任务调度与工作流', '文件存储与多云适配']
   },
   {
-    title: '学习成果',
-    items: ['阶段结果与学习历史', '完成进度与能力变化', '下一步学习建议']
+    title: '前端方向',
+    items: ['UI 卡片化', '主题与布局统一', '通用页面容器规范化', '企业化布局']
   }
 ];
 
+const goTarget = (url: string) => {
+  window.open(url, '__blank');
+};
 </script>
 
 <style lang="scss" scoped>
@@ -93,7 +117,7 @@ const capabilityGroups = [
 
 .hero-panel,
 .section-card {
-  border-radius: 8px;
+  border-radius: 28px;
   border: 1px solid var(--app-surface-border);
   background: var(--app-surface-bg);
   box-shadow: var(--app-shadow-sm);
@@ -101,8 +125,11 @@ const capabilityGroups = [
 }
 
 .hero-panel {
-  display: block;
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(280px, 0.7fr);
+  gap: 18px;
   padding: 30px;
+  background: radial-gradient(circle at top left, rgba(53, 109, 255, 0.16), transparent 30%), var(--app-surface-bg);
 }
 
 .hero-copy {
@@ -112,8 +139,9 @@ const capabilityGroups = [
 
   h1 {
     margin: 0;
-    font-size: 32px;
-    line-height: 1.25;
+    font-size: clamp(30px, 4vw, 46px);
+    line-height: 1.06;
+    letter-spacing: -0.04em;
     color: var(--app-text-title);
   }
 
@@ -139,6 +167,13 @@ const capabilityGroups = [
   text-transform: uppercase;
 }
 
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 8px;
+}
+
 .hero-stats {
   display: grid;
   gap: 12px;
@@ -156,6 +191,7 @@ const capabilityGroups = [
   strong {
     color: var(--app-text-title);
     font-size: 24px;
+    letter-spacing: -0.03em;
   }
 
   span {
@@ -204,7 +240,7 @@ const capabilityGroups = [
 
 .product-card {
   padding: 22px;
-  border-radius: 8px;
+  border-radius: 24px;
   background: var(--app-elevated-soft-bg);
   border: 1px solid var(--app-surface-border);
   transition:
@@ -229,6 +265,7 @@ const capabilityGroups = [
     margin: 0 0 8px;
     color: var(--app-text-title);
     font-size: 22px;
+    letter-spacing: -0.03em;
   }
 
   p {
@@ -255,12 +292,20 @@ const capabilityGroups = [
   margin-top: 18px;
 }
 
+.product-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+
 .capability-card {
+  background: radial-gradient(circle at top right, rgba(14, 165, 233, 0.12), transparent 28%), var(--app-surface-bg);
 }
 
 .capability-group {
   padding: 18px 18px 18px 20px;
-  border-radius: 8px;
+  border-radius: 22px;
   background: var(--app-elevated-soft-bg);
   border: 1px solid var(--app-surface-border);
 
@@ -309,7 +354,7 @@ const capabilityGroups = [
   .hero-panel,
   .section-card {
     padding: 20px;
-    border-radius: 8px;
+    border-radius: 22px;
   }
 
   .product-top {
@@ -317,4 +362,9 @@ const capabilityGroups = [
   }
 }
 
+html.dark {
+  .hero-panel {
+    background: radial-gradient(circle at top left, rgba(53, 109, 255, 0.18), transparent 30%), var(--app-surface-bg);
+  }
+}
 </style>

@@ -28,6 +28,7 @@ export default {
       wechat: 'Wechat Login',
       maxkey: 'MaxKey Login',
       topiam: 'TopIam Login',
+      gitee: 'Gitee Login',
       github: 'Github Login'
     }
   },

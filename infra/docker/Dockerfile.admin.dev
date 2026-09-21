@@ -1,0 +1,7 @@
+FROM node:24-alpine
+
+RUN npm install --global pnpm@10.34.5
+
+WORKDIR /workspace/admin
+
+EXPOSE 5173

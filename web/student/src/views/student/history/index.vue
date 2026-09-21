@@ -38,14 +38,13 @@
             </el-form-item>
             <el-form-item label="完成日期">
               <el-date-picker
-                v-model="taskFilters.dateRange[0]"
-                type="date"
+                v-model="taskFilters.dateRange"
+                type="daterange"
                 value-format="YYYY-MM-DD"
-                placeholder="开始日期"
-                class="date-range-input"
+                range-separator="至"
+                start-placeholder="开始日期"
+                end-placeholder="结束日期"
               />
-              <span class="date-range-separator">至</span>
-              <el-date-picker v-model="taskFilters.dateRange[1]" type="date" value-format="YYYY-MM-DD" placeholder="结束日期" class="date-range-input" />
             </el-form-item>
             <el-form-item class="filter-form__actions">
               <el-button type="primary" native-type="submit">查询</el-button>
@@ -68,14 +67,13 @@
             </el-form-item>
             <el-form-item label="完成日期">
               <el-date-picker
-                v-model="practiceFilters.dateRange[0]"
-                type="date"
+                v-model="practiceFilters.dateRange"
+                type="daterange"
                 value-format="YYYY-MM-DD"
-                placeholder="开始日期"
-                class="date-range-input"
+                range-separator="至"
+                start-placeholder="开始日期"
+                end-placeholder="结束日期"
               />
-              <span class="date-range-separator">至</span>
-              <el-date-picker v-model="practiceFilters.dateRange[1]" type="date" value-format="YYYY-MM-DD" placeholder="结束日期" class="date-range-input" />
             </el-form-item>
             <el-form-item class="filter-form__actions">
               <el-button type="primary" native-type="submit">查询</el-button>
@@ -93,14 +91,13 @@
             </el-form-item>
             <el-form-item label="完成日期">
               <el-date-picker
-                v-model="examFilters.dateRange[0]"
-                type="date"
+                v-model="examFilters.dateRange"
+                type="daterange"
                 value-format="YYYY-MM-DD"
-                placeholder="开始日期"
-                class="date-range-input"
+                range-separator="至"
+                start-placeholder="开始日期"
+                end-placeholder="结束日期"
               />
-              <span class="date-range-separator">至</span>
-              <el-date-picker v-model="examFilters.dateRange[1]" type="date" value-format="YYYY-MM-DD" placeholder="结束日期" class="date-range-input" />
             </el-form-item>
             <el-form-item class="filter-form__actions">
               <el-button type="primary" native-type="submit">查询</el-button>
@@ -122,9 +119,8 @@
             <el-table :data="taskRows" border class="history-table">
               <el-table-column label="每日任务" min-width="250">
                 <template #default="{ row }">
-                  <strong>每日任务</strong>
-                  <span class="table-subtext">{{ taskSubject(row.subject.name) }}</span>
-                  <span class="table-subtext">{{ row.knowledgePoint.name }}</span>
+                  <strong>{{ row.title }}</strong>
+                  <span class="table-subtext">{{ row.subject.name }} · {{ row.knowledgePoint.name }}</span>
                 </template>
               </el-table-column>
               <el-table-column label="完成情况" min-width="160" align="center">
@@ -157,9 +153,9 @@
             <el-table :data="practiceRows" border class="history-table">
               <el-table-column label="练习" min-width="280">
                 <template #default="{ row }">
-                  <strong>{{ practiceTitle(row.practiceType, row.title) }}</strong>
-                  <span class="table-subtext">{{ practiceSubject(row.practiceType, row.subject.name) }}</span>
-                  <span class="table-subtext">{{ primaryKnowledgeName(row.knowledgePoints) }}</span>
+                  <strong>{{ row.title }}</strong>
+                  <span class="table-subtext">{{ practiceTypeText(row.practiceType) }} · {{ row.subject.name }}</span>
+                  <span class="table-subtext">{{ knowledgeNames(row.knowledgePoints) }}</span>
                 </template>
               </el-table-column>
               <el-table-column label="完成情况" min-width="180" align="center">
@@ -192,7 +188,6 @@
                   <span class="table-subtext">
                     {{ examTypeText(row.examType) }} · {{ row.subject?.name ?? '综合考试' }}
                   </span>
-                  <span class="table-subtext">{{ qualificationName() }}</span>
                 </template>
               </el-table-column>
               <el-table-column label="考试结果" min-width="150" align="center">
@@ -242,7 +237,7 @@
         <section class="detail-summary">
           <div>
             <span class="detail-summary__eyebrow">DAILY TASK</span>
-            <h3>每日任务</h3>
+            <h3>{{ taskDetail.title }}</h3>
             <p>{{ taskDetail.knowledgePoint.name }} · 完成于 {{ formatDateTime(taskDetail.completedAt) }}</p>
           </div>
           <div class="score-board">
@@ -338,9 +333,9 @@
         <section class="detail-summary">
           <div>
             <span class="detail-summary__eyebrow">{{ practiceTypeText(practiceDetail.practiceType) }}</span>
-            <h3>{{ practiceTitle(practiceDetail.practiceType, practiceDetail.title) }}</h3>
+            <h3>{{ practiceDetail.title }}</h3>
             <p>
-              {{ practiceSubject(practiceDetail.practiceType, practiceDetail.subject.name) }} ·
+              {{ practiceDetail.subject.name }} ·
               {{ formatPracticePeriod(practiceDetail.startedAt, practiceDetail.completedAt) }}
             </p>
           </div>
@@ -477,8 +472,7 @@
             <span class="detail-summary__eyebrow">{{ examTypeText(examDetail.examType) }}</span>
             <h3>{{ examDetail.title }}</h3>
             <p>
-              {{ qualificationName() }} · {{ examDetail.subject?.name ?? '综合考试' }} · 完成于
-              {{ formatDateTime(examDetail.completedAt) }} ·
+              {{ examDetail.subject?.name ?? '综合考试' }} · 完成于 {{ formatDateTime(examDetail.completedAt) }} ·
               {{ durationText(examDetail.durationSeconds, examDetail.durationLimitSeconds, examDetail.durationStatus) }}
             </p>
           </div>
@@ -673,7 +667,6 @@ const currentTotal = computed(() =>
 const currentPage = computed(() =>
   activeTab.value === 'tasks' ? taskPage.value : activeTab.value === 'practices' ? practicePage.value : examPage.value
 );
-const selectedGoal = computed(() => goals.value.find(item => item.goalId === selectedGoalId.value));
 const heading = computed(() => {
   if (activeTab.value === 'tasks')
     return { eyebrow: 'DAILY TASKS', title: '已完成每日任务', count: `共 ${taskTotal.value} 项` };
@@ -870,23 +863,8 @@ function formatDateOnly(value?: string | null) {
 function formatDateTime(value?: string | null) {
   return value ? value.replace('T', ' ').replace(/([+-]\d{2}:\d{2}|Z)$/, '') : '—';
 }
-function practiceTitle(practiceType: HistoryPracticeType, title: string) {
-  return practiceType === 'KNOWLEDGE_PRACTICE' ? '知识点练习' : title;
-}
-function practiceSubject(practiceType: HistoryPracticeType, subjectName: string) {
-  if (practiceType !== 'KNOWLEDGE_PRACTICE') return `${practiceTypeText(practiceType)} · ${subjectName}`;
-  const certificationName = selectedGoal.value?.certificationName;
-  return certificationName ? `${certificationName} · ${subjectName}` : subjectName;
-}
-function taskSubject(subjectName: string) {
-  const certificationName = selectedGoal.value?.certificationName;
-  return certificationName ? `${certificationName} · ${subjectName}` : subjectName;
-}
-function qualificationName() {
-  return selectedGoal.value?.certificationName ?? '资格名称未标注';
-}
-function primaryKnowledgeName(items: Array<{ name: string }>) {
-  return items[0]?.name || '未标注知识点';
+function knowledgeNames(items: Array<{ name: string }>) {
+  return items.map(item => item.name).join('、') || '未标注知识点';
 }
 function practiceTypeText(value: string) {
   return value === 'KNOWLEDGE_PRACTICE' ? '知识点练习' : '历年真题练习';
@@ -1046,14 +1024,6 @@ function examQuestionTagType(
 .filter-form :deep(.el-select),
 .filter-form :deep(.el-date-editor) {
   width: 100%;
-}
-.filter-form :deep(.date-range-input) {
-  width: calc((100% - 28px) / 2);
-}
-.date-range-separator {
-  width: 28px;
-  color: var(--el-text-color-secondary);
-  text-align: center;
 }
 .filter-form__actions {
   margin-left: auto;

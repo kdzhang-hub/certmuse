@@ -5,13 +5,10 @@ import java.util.List;
 import java.math.BigDecimal;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.dromara.certmuse.ai.client.AiStructuredCompletionClient;
 import org.dromara.certmuse.ai.client.AiStructuredCompletionException;
 import org.dromara.certmuse.ai.config.CertMuseAiProperties;
-import org.dromara.certmuse.ai.domain.AiAgentExecution;
-import org.dromara.certmuse.ai.domain.AiAgentRequest;
-import org.dromara.certmuse.ai.domain.AiAgentTaskType;
 import org.dromara.certmuse.ai.domain.AiModelRequest;
-import org.dromara.certmuse.agent.service.AiAgentExecutor;
 import org.dromara.certmuse.assessment.domain.AiGradingTaskRow;
 import org.dromara.certmuse.assessment.domain.QuestionAiRubricRow;
 import org.dromara.certmuse.assessment.mapper.AiGradingMapper;
@@ -26,7 +23,7 @@ import tools.jackson.databind.json.JsonMapper;
 @RequiredArgsConstructor
 public class SubjectiveGradingTaskDispatcher {
     private final AiGradingMapper mapper;
-    private final AiAgentExecutor agentExecutor;
+    private final AiStructuredCompletionClient completionClient;
     private final CertMuseAiProperties properties;
     private final JsonMapper jsonMapper;
 
@@ -45,18 +42,7 @@ public class SubjectiveGradingTaskDispatcher {
                 finishFailure(task, "AI_GRADING_DISABLED");
                 return;
             }
-            JsonNode taskPayload = payload(task);
-            AiAgentTaskType taskType = "RUBRIC_GENERATION".equals(task.getTaskType())
-                ? AiAgentTaskType.RUBRIC_GENERATION : AiAgentTaskType.ANSWER_GRADING;
-            List<Long> knowledgeIds = new ArrayList<>();
-            taskPayload.path("knowledgePointIds").forEach(value -> {
-                long id = value.asLong(0);
-                if (id > 0) knowledgeIds.add(id);
-            });
-            AiAgentExecution execution = agentExecutor.prepare(new AiAgentRequest(taskType,
-                "cm_ai_grading_task", task.getId(), knowledgeIds,
-                taskPayload.path("retrievalQuery").asText(""), request(task)));
-            String output = agentExecutor.complete(execution);
+            String output = completionClient.complete(request(task));
             JsonNode result = jsonMapper.readTree(output);
             if (!result.isObject()) {
                 throw new AiStructuredCompletionException("AI_OUTPUT_INVALID", "AI output must be a JSON object", null);

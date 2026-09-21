@@ -1,0 +1,24 @@
+# Declarative requirements only. Actual hosts, database credentials, SSH keys,
+# policies and audit paths remain in srv-ops/.srv-ops-local and are never copied here.
+control_plane: srv-ops
+environment: production
+application_domain: cm.jklin.me
+
+required_profiles:
+  servers:
+    - certmuse-app
+  databases:
+    - certmuse-pg
+    - certmuse-redis
+
+required_capabilities:
+  - upload-versioned-release
+  - read-service-and-nginx-status
+  - manage-certmuse-systemd-unit
+  - read-and-execute-approved-postgres-migrations
+  - read-redis-health
+
+constraints:
+  - no-plaintext-secrets-in-repository
+  - no-direct-ssh-outside-srv-ops
+  - require-policy-check-before-change
